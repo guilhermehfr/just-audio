@@ -1,0 +1,9 @@
+node_modules
+.next
+out
+build
+dist
+public/uploads
+db.sqlite3
+pnpm-lock.yaml
+ .husky
