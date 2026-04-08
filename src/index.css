@@ -1,17 +1,18 @@
 @import 'tailwindcss';
 
 @theme inline {
-  --default-font-family: Satoshi, sans-serif;
+  --default-font-family: 'Inter', sans-serif;
 
   --color-base: #0d0d0d;
   --color-surface: #141414;
   --color-accent: #e53935;
-  --color-primary: #e8e8e8;
+  --color-default: #e8e8e8;
   --color-muted: #444444;
 }
 
 @layer base {
   body {
-    @apply bg-base text-primary antialiased;
+    @apply bg-base text-default antialiased;
+    font-family: var(--default-font-family);
   }
 }
