@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 
 @theme inline {
-  --default-font-family: 'Inter', sans-serif;
+  --default-font-family: var(--font-inter);
 
   --color-base: #0d0d0d;
   --color-surface: #141414;

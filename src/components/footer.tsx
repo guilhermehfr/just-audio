@@ -10,7 +10,12 @@ export function Footer(): React.ReactNode {
     >
       <span>
         Made by{' '}
-        <a className="text-accent" href="https://github.com/guilhermehfr/just-audio">
+        <a
+          className="text-accent"
+          href="https://github.com/guilhermehfr/just-audio"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           Guilherme Henrique
         </a>
       </span>
