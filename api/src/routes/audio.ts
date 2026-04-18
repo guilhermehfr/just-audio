@@ -1,4 +1,5 @@
 import { Router, type Router as RouterType } from 'express'
+
 import { AudioController } from '../controllers/audio'
 import { AudioExtractionService } from '../services/AudioExtractionService'
 import { ProgressService } from '../services/ProgressService'
@@ -6,12 +7,10 @@ import { ProgressRepository } from '../repositories/ProgressRepository'
 
 const router: RouterType = Router()
 
-// Initialize repositories and services
 const progressRepository = new ProgressRepository()
 const progressService = new ProgressService(progressRepository)
 const audioExtractionService = new AudioExtractionService(progressService)
 
-// Initialize controller with dependency injection
 const audioController = new AudioController(
   audioExtractionService,
   progressService

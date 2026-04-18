@@ -1,3 +1,9 @@
+import fs from 'node:fs'
+import path from 'node:path'
+import { createRequire } from 'node:module'
+
+const require = createRequire(import.meta.url)
+
 import { Readable } from 'stream'
 import { spawn } from 'child_process'
 
@@ -16,14 +22,21 @@ export class YouTubeDLError extends Error {
     this.name = 'YouTubeDLError'
   }
 }
-
 /**
- * Find yt-dlp binary from installed youtube-dl-exec package
+ * Resolve yt-dlp binary path from youtube-dl-exec package
  */
-function getYtDlpPath(): string {
-  // The youtube-dl-exec package bundles yt-dlp binary
-  // Direct path based on pnpm workspace structure
-  return '/home/guilhermehenrique/projects/self-projects/just-audio/node_modules/.pnpm/youtube-dl-exec@3.1.5/node_modules/youtube-dl-exec/bin/yt-dlp'
+export function getYtDlpPath(): string {
+  const packageJsonPath = require.resolve('youtube-dl-exec/package.json')
+  const packageDir = path.dirname(packageJsonPath)
+
+  const binaryName = process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp'
+  const binaryPath = path.join(packageDir, 'bin', binaryName)
+
+  if (!fs.existsSync(binaryPath)) {
+    throw new Error(`yt-dlp binary not found at: ${binaryPath}`)
+  }
+
+  return binaryPath
 }
 
 /**

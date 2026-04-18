@@ -4,7 +4,6 @@ import {
   YouTubeDLError,
   createAudioStream,
 } from '../utils/youtube-dl'
-import { AudioExtractionRequest, AudioExtractionResponse } from '../types'
 import { ApiError } from '../middleware/errorHandler'
 import { ProgressService } from './ProgressService'
 
@@ -46,7 +45,7 @@ export class AudioExtractionService {
    * Create audio stream for URL
    * Returns readable stream
    */
-  async createAudioStream(url: string, onProgress?: (message: string) => void) {
+  async createReadableAudioStream(url: string, onProgress?: (message: string) => void) {
     try {
       return await createAudioStream(url, onProgress)
     } catch (error) {

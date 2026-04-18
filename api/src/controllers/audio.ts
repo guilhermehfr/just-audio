@@ -104,7 +104,7 @@ export class AudioController {
 
       await this.audioExtractionService.updateStreamProgress(trackingId, 'Starting download...')
 
-      const { stream: ytdlpStream } = await this.audioExtractionService.createAudioStream(
+      const { stream: ytdlpStream } = await this.audioExtractionService.createReadableAudioStream(
         url,
         async (progress) => {
           await this.audioExtractionService.updateStreamProgress(trackingId, progress)
