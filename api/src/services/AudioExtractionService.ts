@@ -19,11 +19,11 @@ export class AudioExtractionService {
    */
   validateUrl(url: string): void {
     if (!url) {
-      throw new ApiError(400, 'MISSING_URL', 'URL is required')
+      throw new ApiError('MISSING_URL', 'URL is required')
     }
 
     if (!isValidVideoUrl(url)) {
-      throw new ApiError(400, 'INVALID_URL', 'URL is not a supported video platform')
+      throw new ApiError('INVALID_URL', 'URL is not a supported video platform')
     }
   }
 
@@ -35,7 +35,7 @@ export class AudioExtractionService {
       return await getVideoMetadata(url)
     } catch (error) {
       if (error instanceof YouTubeDLError) {
-        throw new ApiError(400, 'FETCH_FAILED', error.message)
+        throw new ApiError('FETCH_FAILED', error.message)
       }
       throw error
     }
@@ -50,7 +50,7 @@ export class AudioExtractionService {
       return await createAudioStream(url, onProgress)
     } catch (error) {
       if (error instanceof YouTubeDLError) {
-        throw new ApiError(400, 'STREAM_FAILED', error.message)
+        throw new ApiError('STREAM_FAILED', error.message)
       }
       throw error
     }

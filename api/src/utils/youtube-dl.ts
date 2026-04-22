@@ -33,7 +33,7 @@ export function getYtDlpPath(): string {
   const binaryPath = path.join(packageDir, 'bin', binaryName)
 
   if (!fs.existsSync(binaryPath)) {
-    throw new Error(`yt-dlp binary not found at: ${binaryPath}`)
+    throw new YouTubeDLError(`yt-dlp binary not found at: ${binaryPath}`)
   }
 
   return binaryPath
@@ -93,10 +93,10 @@ export async function getVideoMetadata(url: string): Promise<VideoInfo> {
             }
             resolve(result)
           } catch (e) {
-            reject(new Error(`Failed to parse yt-dlp output: ${e}`))
+            reject(new YouTubeDLError(`Failed to parse yt-dlp output: ${e}`))
           }
         } else {
-          reject(new Error(`yt-dlp failed with code ${code}: ${errorOutput || 'Unknown error'}`))
+          reject(new YouTubeDLError(`yt-dlp failed with code ${code}: ${errorOutput || 'Unknown error'}`))
         }
       })
 
@@ -143,7 +143,7 @@ export async function createAudioStream(
     ])
 
     if (!process.stdout) {
-      throw new Error('Failed to create audio stream - no stdout')
+      throw new YouTubeDLError('Failed to create audio stream - no stdout')
     }
 
     if (onProgress) {

@@ -1,14 +1,37 @@
 import { Request, Response, NextFunction } from 'express'
 import { ApiResponse } from '../types/index'
 
+// Map error codes to HTTP status codes
+const ERROR_STATUS_MAP: Record<string, number> = {
+  // 400 Bad Request
+  'MISSING_URL': 400,
+  'INVALID_URL': 400,
+  'FETCH_FAILED': 400,
+  'STREAM_FAILED': 400,
+  'MISSING_TRACKING_ID': 400,
+  // 404 Not Found
+  'NOT_FOUND': 404,
+  // 500 Internal Server Error
+  'INTERNAL_ERROR': 500,
+  'STREAM_ERROR': 500,
+  'INTERNAL_SERVER_ERROR': 500,
+}
+
 export class ApiError extends Error {
   constructor(
-    public statusCode: number,
     public code: string,
     message: string
   ) {
     super(message)
     this.name = 'ApiError'
+  }
+
+  /**
+   * Get HTTP status code based on error code
+   * Defaults to 500 for unknown codes
+   */
+  getStatusCode(): number {
+    return ERROR_STATUS_MAP[this.code] ?? 500
   }
 }
 
@@ -32,7 +55,7 @@ export const errorHandler = (
       },
       timestamp: new Date().toISOString(),
     }
-    return res.status(err.statusCode).json(response)
+    return res.status(err.getStatusCode()).json(response)
   }
 
   const response: ApiResponse = {

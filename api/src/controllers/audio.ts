@@ -41,7 +41,7 @@ export class AudioController {
     } catch (error) {
       if (error instanceof ApiError) throw error
       console.log('Unexpected error in getAudioInfo', error)
-      throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to fetch audio info')
+      throw new ApiError('INTERNAL_ERROR', 'Failed to fetch audio info')
     }
   }
 
@@ -81,7 +81,7 @@ export class AudioController {
 
       if (error instanceof ApiError) throw error
       console.log('Unexpected error in extractAudio', error)
-      throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to extract audio')
+      throw new ApiError('INTERNAL_ERROR', 'Failed to extract audio')
     }
   }
 
@@ -94,12 +94,12 @@ export class AudioController {
 
     try {
       if (!trackingId) {
-        throw new ApiError(400, 'MISSING_TRACKING_ID', 'trackingId is required')
+        throw new ApiError('MISSING_TRACKING_ID', 'trackingId is required')
       }
 
       const { url } = req.query as { url?: string }
       if (!url) {
-        throw new ApiError(400, 'MISSING_URL', 'URL is required as query parameter')
+        throw new ApiError('MISSING_URL', 'URL is required as query parameter')
       }
 
       await this.audioExtractionService.updateStreamProgress(trackingId, 'Starting download...')
@@ -174,7 +174,7 @@ export class AudioController {
 
       if (!res.headersSent) {
         console.log('Unexpected error in streamAudio', { trackingId, error: error instanceof Error ? error.message : String(error) })
-        throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to stream audio')
+        throw new ApiError('INTERNAL_ERROR', 'Failed to stream audio')
       }
     }
   }
@@ -184,13 +184,13 @@ export class AudioController {
       const trackingId = req.params.trackingId as string
 
       if (!trackingId) {
-        throw new ApiError(400, 'MISSING_TRACKING_ID', 'trackingId is required')
+        throw new ApiError('MISSING_TRACKING_ID', 'trackingId is required')
       }
 
       const progress = await this.progressService.getProgress(trackingId)
 
       if (!progress) {
-        throw new ApiError(404, 'NOT_FOUND', 'No progress data found for this trackingId')
+        throw new ApiError('NOT_FOUND', 'No progress data found for this trackingId')
       }
 
       const response: ApiResponse<ProgressData> = {
@@ -203,7 +203,7 @@ export class AudioController {
     } catch (error) {
       if (error instanceof ApiError) throw error
       console.log('Unexpected error in getProgress', error)
-      throw new ApiError(500, 'INTERNAL_ERROR', 'Failed to get progress')
+      throw new ApiError('INTERNAL_ERROR', 'Failed to get progress')
     }
   }
 
