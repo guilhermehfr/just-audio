@@ -1,5 +1,10 @@
 import { Request, Response } from 'express'
-import { ApiResponse, AudioExtractionRequest, AudioExtractionResponse, ProgressData } from '../types'
+import {
+  ApiResponse,
+  AudioExtractionRequest,
+  AudioExtractionResponse,
+  ProgressData,
+} from '../types'
 import { ApiError } from '../middleware/errorHandler'
 import { AudioExtractionService } from '../services/AudioExtractionService'
 import { ProgressService } from '../services/ProgressService'
@@ -23,7 +28,6 @@ export class AudioController {
       const { url } = req.body
 
       this.audioExtractionService.validateUrl(url)
-
 
       const metadata = await this.audioExtractionService.fetchMetadata(url)
 
@@ -57,7 +61,6 @@ export class AudioController {
       this.audioExtractionService.validateUrl(url)
 
       await this.audioExtractionService.initializeStreaming(trackingId)
-
 
       const metadata = await this.audioExtractionService.fetchMetadata(url)
 
@@ -140,19 +143,25 @@ export class AudioController {
       })
 
       ffmpegStream.on('error', async (error) => {
-        console.log('FFmpeg stream error', { trackingId, error: error instanceof Error ? error.message : String(error) })
+        console.log('FFmpeg stream error', {
+          trackingId,
+          error: error instanceof Error ? error.message : String(error),
+        })
         if (!res.headersSent) {
           res.status(500).json({
             success: false,
             error: { code: 'STREAM_ERROR', message: 'Audio streaming failed' },
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           })
         }
         await this.audioExtractionService.handleStreamingError(trackingId, error)
       })
 
       ytdlpStream.on('error', (error) => {
-        console.log('yt-dlp stream error', { trackingId, error: error instanceof Error ? error.message : String(error) })
+        console.log('yt-dlp stream error', {
+          trackingId,
+          error: error instanceof Error ? error.message : String(error),
+        })
       })
 
       res.on('error', (error) => {
@@ -173,7 +182,10 @@ export class AudioController {
       }
 
       if (!res.headersSent) {
-        console.log('Unexpected error in streamAudio', { trackingId, error: error instanceof Error ? error.message : String(error) })
+        console.log('Unexpected error in streamAudio', {
+          trackingId,
+          error: error instanceof Error ? error.message : String(error),
+        })
         throw new ApiError('INTERNAL_ERROR', 'Failed to stream audio')
       }
     }

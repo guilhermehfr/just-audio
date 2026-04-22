@@ -1,5 +1,2 @@
-node_modules
-dist
-public/uploads
-pnpm-lock.yaml
-.husky
+node_modules/
+dist/

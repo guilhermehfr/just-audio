@@ -11,10 +11,7 @@ const progressRepository = new ProgressRepository()
 const progressService = new ProgressService(progressRepository)
 const audioExtractionService = new AudioExtractionService(progressService)
 
-const audioController = new AudioController(
-  audioExtractionService,
-  progressService
-)
+const audioController = new AudioController(audioExtractionService, progressService)
 
 /**
  * @route POST /api/audio/info
@@ -22,9 +19,7 @@ const audioController = new AudioController(
  * @body { url: string }
  * @returns { title, duration, thumbnail }
  */
-router.post('/info', (req, res, next) =>
-  audioController.getAudioInfo(req, res).catch(next)
-)
+router.post('/info', (req, res, next) => audioController.getAudioInfo(req, res).catch(next))
 
 /**
  * @route POST /api/audio/extract
@@ -32,9 +27,7 @@ router.post('/info', (req, res, next) =>
  * @body { url: string, trackingId?: string }
  * @returns { title, duration, thumbnail, audioUrl, progress }
  */
-router.post('/extract', (req, res, next) =>
-  audioController.extractAudio(req, res).catch(next)
-)
+router.post('/extract', (req, res, next) => audioController.extractAudio(req, res).catch(next))
 
 /**
  * @route GET /api/audio/stream/:trackingId

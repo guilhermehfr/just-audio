@@ -64,7 +64,8 @@ export async function getVideoMetadata(url: string): Promise<VideoInfo> {
       let errorOutput = ''
 
       const process = spawn(ytDlpPath, [
-        '--js-runtimes', 'node',
+        '--js-runtimes',
+        'node',
         '--dump-json',
         '--no-warnings',
         '-q',
@@ -96,7 +97,9 @@ export async function getVideoMetadata(url: string): Promise<VideoInfo> {
             reject(new YouTubeDLError(`Failed to parse yt-dlp output: ${e}`))
           }
         } else {
-          reject(new YouTubeDLError(`yt-dlp failed with code ${code}: ${errorOutput || 'Unknown error'}`))
+          reject(
+            new YouTubeDLError(`yt-dlp failed with code ${code}: ${errorOutput || 'Unknown error'}`)
+          )
         }
       })
 
@@ -131,12 +134,17 @@ export async function createAudioStream(
 
     // Use yt-dlp to extract audio stream to stdout
     const process = spawn(ytDlpPath, [
-      '--js-runtimes', 'node',
-      '--format', 'bestaudio/best',
+      '--js-runtimes',
+      'node',
+      '--format',
+      'bestaudio/best',
       '--extract-audio',
-      '--audio-format', 'm4a',
-      '--audio-quality', '128K',
-      '-o', '-', // Output to stdout
+      '--audio-format',
+      'm4a',
+      '--audio-quality',
+      '128K',
+      '-o',
+      '-', // Output to stdout
       '--no-warnings',
       '-q',
       url,

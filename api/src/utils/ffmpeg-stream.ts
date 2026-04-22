@@ -24,17 +24,23 @@ export function createAudioStream(
   // FFmpeg command args for M4A audio conversion
   // Use movflags to support non-seekable outputs (streaming to stdout)
   const ffmpegArgs = [
-    '-i', 'pipe:0',           // Read from stdin
-    '-c:a', format,           // Audio codec (aac)
-    '-b:a', bitrate,          // Bitrate (128k)
-    '-ar', String(sampleRate), // Sample rate (44100)
-    '-movflags', 'frag_keyframe+empty_moov', // Allow streaming to non-seekable output
-    '-f', 'ipod',             // Output format (M4A)
-    'pipe:1'                  // Write to stdout
+    '-i',
+    'pipe:0', // Read from stdin
+    '-c:a',
+    format, // Audio codec (aac)
+    '-b:a',
+    bitrate, // Bitrate (128k)
+    '-ar',
+    String(sampleRate), // Sample rate (44100)
+    '-movflags',
+    'frag_keyframe+empty_moov', // Allow streaming to non-seekable output
+    '-f',
+    'ipod', // Output format (M4A)
+    'pipe:1', // Write to stdout
   ]
 
   const ffmpeg = spawn(ffmpegInstaller.path, ffmpegArgs, {
-    stdio: ['pipe', 'pipe', 'pipe']
+    stdio: ['pipe', 'pipe', 'pipe'],
   })
 
   // Create output stream - PassThrough allows us to forward data
@@ -76,6 +82,3 @@ export function createAudioStream(
 
   return { stream: outputStream }
 }
-
-
-
