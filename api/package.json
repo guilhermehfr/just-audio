@@ -1,7 +1,6 @@
 {
   "name": "api",
   "version": "1.0.0",
-  "description": "Just Audio API - Audio processing and download service",
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
@@ -12,14 +11,6 @@
     "lint:fix": "eslint src --ext .ts --fix",
     "type-check": "tsc --noEmit"
   },
-  "keywords": [
-    "audio",
-    "download",
-    "ffmpeg",
-    "youtube-dl"
-  ],
-  "author": "",
-  "license": "ISC",
   "type": "module",
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
@@ -37,6 +28,8 @@
     "@types/express": "^5.0.6",
     "@types/fluent-ffmpeg": "^2.1.28",
     "@types/node": "^20.19.39",
+    "@typescript-eslint/eslint-plugin": "^8.59.0",
+    "@typescript-eslint/parser": "^8.59.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }

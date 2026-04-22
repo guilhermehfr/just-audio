@@ -80,7 +80,7 @@ export class AudioExtractionService {
   /**
    * Handle streaming error
    */
-  async handleStreamingError(trackingId: string, error: any): Promise<void> {
+  async handleStreamingError(trackingId: string, error: unknown): Promise<void> {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     await this.progressService.setError(trackingId, errorMessage)
     console.log('Audio streaming error', { trackingId, error: errorMessage })

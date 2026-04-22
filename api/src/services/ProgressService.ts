@@ -4,6 +4,7 @@ import { ProgressRepository } from '../repositories/ProgressRepository'
 /**
  * ProgressService - Manages extraction progress tracking
  */
+
 export class ProgressService {
   constructor(private progressRepository: ProgressRepository) {}
 
@@ -16,14 +17,21 @@ export class ProgressService {
     await this.progressRepository.create(trackingId, initialData)
   }
 
-  async updateProgress(trackingId: string, message: string, status?: string): Promise<void> {
+  async updateProgress(
+    trackingId: string,
+    message: string,
+    status?: 'pending' | 'downloading' | 'processing' | 'complete' | 'error'
+  ): Promise<void> {
     await this.progressRepository.update(trackingId, {
       progress: message,
-      ...(status && { status: status as any }),
+      ...(status && { status }),
     })
   }
 
-  async setStatus(trackingId: string, status: 'pending' | 'downloading' | 'processing' | 'complete' | 'error'): Promise<void> {
+  async setStatus(
+    trackingId: string,
+    status: 'pending' | 'downloading' | 'processing' | 'complete' | 'error'
+  ): Promise<void> {
     await this.progressRepository.update(trackingId, { status })
   }
 
