@@ -15,25 +15,29 @@ const audioController = new AudioController(audioExtractionService, progressServ
 
 /**
  * @route POST /api/audio/info
- * @description Fetch video metadata (title, duration, thumbnail)
- * @body { url: string }
- * @returns { title, duration, thumbnail }
+ * @description Fetch video metadata without extraction
+ * @body { url: string } - Video URL (required)
+ * @returns { title: string, duration: number, thumbnail: string }
+ * @note Does not start audio extraction or tracking
  */
 router.post('/info', (req, res, next) => audioController.getAudioInfo(req, res).catch(next))
 
 /**
  * @route POST /api/audio/extract
- * @description Extract audio from video - returns metadata and streaming URL immediately
- * @body { url: string, trackingId?: string }
- * @returns { title, duration, thumbnail, audioUrl, progress }
+ * @description Initiate audio extraction - generates trackingId for progress tracking and streaming
+ * @body { url: string (required), trackingId?: string (optional - auto-generated if not provided) }
+ * @returns { title: string, duration: number, thumbnail: string, audioUrl: string, progress: string }
+ * @note This is the FIRST step. Returns audioUrl and trackingId to use in subsequent calls to /stream and /progress
  */
 router.post('/extract', (req, res, next) => audioController.extractAudio(req, res).catch(next))
 
 /**
  * @route GET /api/audio/stream/:trackingId
- * @description Stream extracted audio - yt-dlp → FFmpeg → M4A audio
- * @query { url: string } - The video URL to stream from
- * @returns binary audio file (m4a)
+ * @description Download/stream audio file using trackingId and video URL
+ * @params { trackingId: string (required) } - Tracking ID from POST /extract response
+ * @query { url: string (required) } - The video URL to extract audio from
+ * @returns binary audio file (m4a) with Content-Disposition header
+ * @note Call this after POST /extract. Monitor progress via GET /progress/:trackingId
  */
 router.get('/stream/:trackingId', (req, res, next) =>
   audioController.streamAudio(req, res).catch(next)
@@ -41,9 +45,10 @@ router.get('/stream/:trackingId', (req, res, next) =>
 
 /**
  * @route GET /api/audio/progress/:trackingId
- * @description Poll extraction/streaming progress
- * @params { trackingId: string }
- * @returns { trackingId, progress, status, error? }
+ * @description Poll progress of audio extraction/streaming
+ * @params { trackingId: string (required) } - Tracking ID from POST /extract response
+ * @returns { trackingId: string, progress: string, status: 'pending'|'downloading'|'processing'|'complete'|'error', error?: string }
+ * @note Poll periodically (e.g., every 500ms) to monitor extraction progress
  */
 router.get('/progress/:trackingId', (req, res, next) =>
   audioController.getProgress(req, res).catch(next)

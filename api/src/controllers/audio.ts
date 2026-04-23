@@ -21,7 +21,9 @@ export class AudioController {
   ) {}
 
   /**
-   * Get audio info - Fetch video metadata only
+   * Get audio info - Fetch video metadata without initiating extraction
+   * @param url - Video URL (required, from body)
+   * @returns metadata object with title, duration, thumbnail
    */
   async getAudioInfo(req: Request, res: Response): Promise<void> {
     try {
@@ -50,7 +52,12 @@ export class AudioController {
   }
 
   /**
-   * Extract audio - Return streaming URL and metadata immediately
+   * Extract audio - Initiate extraction workflow and return trackingId
+   * Generates unique trackingId for progress polling and downloading
+   * @param url - Video URL (required, from body)
+   * @param trackingId - Custom tracking ID (optional, from body; auto-generated if omitted)
+   * @returns metadata + audioUrl (with trackingId) + initial progress
+   * @workflow Start here → Poll /progress/:trackingId → Call /stream/:trackingId to download
    */
   async extractAudio(req: Request, res: Response): Promise<void> {
     const trackingId = this.generateTrackingId(req.body.trackingId)
@@ -71,6 +78,7 @@ export class AudioController {
           duration: metadata.duration,
           thumbnail: metadata.thumbnail,
           audioUrl: `/api/audio/stream/${trackingId}`,
+          trackingId,
           progress: '0%',
         },
         timestamp: new Date().toISOString(),
@@ -89,8 +97,12 @@ export class AudioController {
   }
 
   /**
-   * Stream audio - Pipe ytdl-core → FFmpeg → HTTP response
-   * This is called when client accesses the streaming URL
+   * Stream audio - Download audio from URL using trackingId for progress tracking
+   * Pipes: yt-dlp video stream → FFmpeg audio processing → HTTP response as M4A file
+   * @param trackingId - Tracking ID from POST /extract response (required, from params)
+   * @param url - Video URL (required, from query string)
+   * @returns binary M4A audio file + progress updates via trackingId
+   * @workflow Call after POST /extract and optional /progress polling
    */
   async streamAudio(req: Request, res: Response): Promise<void> {
     const trackingId = req.params.trackingId as string
@@ -191,6 +203,12 @@ export class AudioController {
     }
   }
 
+  /**
+   * Get progress - Poll extraction/streaming status
+   * @param trackingId - Tracking ID from POST /extract response (required, from params)
+   * @returns { trackingId, progress percentage, status, error (if failed) }
+   * @note Poll periodically (e.g., every 500ms) to monitor real-time progress
+   */
   async getProgress(req: Request, res: Response): Promise<void> {
     try {
       const trackingId = req.params.trackingId as string
