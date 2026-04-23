@@ -19,21 +19,21 @@ export function createAudioStream(
   inputStream: Readable,
   options: AudioStreamOptions = {}
 ): { stream: Readable } {
-  const { bitrate = '128k', format = 'aac', sampleRate = 44100 } = options
+  const { bitrate = '192k', format = 'aac', sampleRate = 44100 } = options
 
   // FFmpeg command args for M4A audio conversion
-  // Use movflags to support non-seekable outputs (streaming to stdout)
+  // frag_keyframe: Creates fragmented MP4 suitable for streaming
   const ffmpegArgs = [
     '-i',
     'pipe:0', // Read from stdin
     '-c:a',
     format, // Audio codec (aac)
     '-b:a',
-    bitrate, // Bitrate (128k)
+    bitrate, // Bitrate (192k default - high quality)
     '-ar',
     String(sampleRate), // Sample rate (44100)
     '-movflags',
-    'frag_keyframe+empty_moov', // Allow streaming to non-seekable output
+    'frag_keyframe', // Fragmented MP4 for proper streaming
     '-f',
     'ipod', // Output format (M4A)
     'pipe:1', // Write to stdout

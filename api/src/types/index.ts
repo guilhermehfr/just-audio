@@ -33,6 +33,7 @@ export interface AudioExtractionResponse {
   title: string
   duration: number
   thumbnail: string
+  trackingId?: string
   audioUrl?: string
   progress?: string
   trimmed?: boolean
