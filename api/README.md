@@ -8,9 +8,9 @@ Production-ready Express.js API for audio extraction and streaming from YouTube,
 
 - ✅ YouTube metadata extraction
 - ✅ Audio streaming (zero-disk I/O with FFmpeg piping)
-- ✅ Progress tracking
 - ✅ Service/Repository/DI architecture
 - ✅ Full TypeScript strict mode
+- ✅ Unit tests with Vitest
 
 ## Directory Structure
 
@@ -82,6 +82,7 @@ pnpm run start:prod
 - `pnpm run build` — Build TypeScript to `dist/`
 - `pnpm run start` — Start production server
 - `pnpm run start:prod` — Build and start in one command
+- `pnpm run test` — Run unit tests with Vitest
 - `pnpm run lint` — Run ESLint
 - `pnpm run lint:fix` — Fix ESLint issues automatically
 - `pnpm run type-check` — Type check without emitting files
@@ -140,7 +141,7 @@ Content-Type: application/json
     "duration": 19,
     "thumbnail": "https://i.ytimg.com/vi/jNQXAC9IVRw/hqdefault.jpg?...",
     "audioUrl": "/api/audio/stream/audio-1776377416099-9n511f",
-    "progress": "0%"
+    "trackingId": "audio-1776377416099-9n511f"
   },
   "timestamp": "2026-04-16T22:10:00.000Z"
 }
@@ -148,29 +149,6 @@ Content-Type: application/json
 
 **Parameters:**
 - `url` (required) — Video URL (YouTube, Vimeo, Dailymotion, etc.)
-
-#### Check Extraction Progress
-
-Poll the status of an ongoing extraction.
-
-```
-GET /api/audio/progress/audio-1776377416099-9n511f
-```
-
-**Response (200 OK):**
-```json
-{
-  "success": true,
-  "data": {
-    "trackingId": "audio-1776377416099-9n511f",
-    "progress": "50%",
-    "status": "downloading"
-  },
-  "timestamp": "2026-04-16T22:10:00.000Z"
-}
-```
-
-**Status values:** `pending`, `downloading`, `processing`, `complete`, `error`
 
 #### Stream Audio File
 
@@ -219,20 +197,21 @@ Error responses:
 - `INVALID_URL` — URL is not a supported video platform (400)
 - `MISSING_TRACKING_ID` — Tracking ID parameter not provided (400)
 - `FETCH_FAILED` — Failed to fetch video metadata (400)
-- `STREAM_FAILED` — Failed to create audio stream (500)
+- `STREAM_ERROR` — Failed to create audio stream (500)
 - `INTERNAL_ERROR` — Unexpected server error (500)
 
 ## Features
 
 - ✅ **Express.js 5.x** with TypeScript strict mode
-- ✅ **YouTube audio extraction** using yt-dlp (NPM package, no system dependencies)
+- ✅ **YouTube/Vimeo audio extraction** using youtube-dl-exec NPM package
 - ✅ **FFmpeg streaming** with non-seekable output support (`-movflags frag_keyframe+empty_moov`)
-- ✅ **Zero-disk I/O architecture** (yt-dlp → FFmpeg → HTTP response piping)
+- ✅ **Zero-disk I/O architecture** (youtube-dl → FFmpeg → HTTP response piping)
 - ✅ **Service/Repository/DI pattern** for clean separation of concerns
-- ✅ **Real-time progress tracking** for async operations
 - ✅ **Structured error handling** with custom `ApiError` class
+- ✅ **CORS middleware** with configurable origin
 - ✅ **Graceful shutdown** on SIGTERM/SIGINT
 - ✅ **Full TypeScript compilation** with no errors
+- ✅ **ESLint & Prettier** for code quality
 
 ## Architecture
 
@@ -252,18 +231,10 @@ Error responses:
 
 **FFmpeg utility** → pipes audio through FFmpeg for encoding
 
-↓
-
-**ProgressService** → tracks async operation status
-
-↓
-
-**ProgressRepository** → in-memory progress storage (swappable with Redis/DB)
-
 ### Key Components
 
 - **AudioController** ([controllers/audio.ts](src/controllers/audio.ts))
-  - Handles 4 HTTP endpoints
+  - Handles 3 HTTP endpoints
   - Delegates business logic to services
   - Manages streaming responses
 
@@ -271,15 +242,10 @@ Error responses:
   - URL validation
   - Metadata fetching via yt-dlp
   - Audio stream creation and piping
-  - Progress updates
 
-- **ProgressService** ([services/ProgressService.ts](src/services/ProgressService.ts))
-  - Track extraction status by trackingId
-  - Support for pending/downloading/processing/complete/error states
-
-- **yt-dlp utility** ([utils/youtube-dl.ts](src/utils/youtube-dl.ts))
-  - Spawns yt-dlp binary (from youtube-dl-exec NPM package)
-  - Requires `--js-runtimes node` flag for JavaScript execution
+- **youtube-dl utility** ([utils/youtube-dl.ts](src/utils/youtube-dl.ts))
+  - Uses youtube-dl-exec NPM package for video audio extraction
+  - Handles JavaScript runtime configuration automatically
   - Returns readable stream for audio data
 
 - **FFmpeg utility** ([utils/ffmpeg-stream.ts](src/utils/ffmpeg-stream.ts))
@@ -297,7 +263,7 @@ Express Route → AudioController
     ↓
 AudioExtractionService (validates, fetches metadata, initiates streaming)
     ↓
-yt-dlp Process (downloads audio from YouTube)
+youtube-dl-exec Process (downloads audio from YouTube)
     ↓
 FFmpeg Process (encodes to M4A)
     ↓
@@ -314,28 +280,29 @@ HTTP Response ← Client receives audio file
 
 ## Testing
 
-All 4 routes have been validated with real YouTube video:
+All 3 routes have 9 unit tests covering success cases and validation:
 
 ```
-✅ Route 1: Get Audio Info     (metadata extraction)
-✅ Route 2: Extract Audio       (streaming initialization)
-✅ Route 3: Check Progress      (status polling)
-✅ Route 4: Stream Audio        (300KB+ M4A file download)
+✅ POST /api/audio/info        (metadata extraction)
+✅ POST /api/audio/extract    (streaming initialization)
+✅ GET /api/audio/stream/:id  (validation & error handling)
 ```
 
-Test file: [final-validation.js](../final-validation.js)
+Test file: [src/routes/audio.test.ts](src/routes/audio.test.ts)
 
 ## Implementation Status
 
 ### ✅ Completed
 - [x] Audio metadata extraction (`POST /api/audio/info`)
 - [x] Audio streaming (`POST /api/audio/extract` + `GET /api/audio/stream/:id`)
-- [x] Progress tracking (`GET /api/audio/progress/:id`)
-- [x] YouTube support (yt-dlp integration)
+- [x] YouTube/Vimeo support (youtube-dl-exec integration)
 - [x] FFmpeg streaming with non-seekable output support
 - [x] Service/Repository/DI architecture
 - [x] Error handling middleware
+- [x] CORS middleware with configurable origin
 - [x] TypeScript strict mode
+- [x] ESLint configuration
+- [x] Prettier code formatting
 - [x] All routes tested with real YouTube videos
 
 ### 🔮 Future Enhancements
@@ -355,6 +322,12 @@ Test file: [final-validation.js](../final-validation.js)
 |----------|---------|-------------|
 | `NODE_ENV` | development | Environment (development \| production) |
 | `PORT` | 3000 | Server port |
+| `LOG_LEVEL` | info | Logging level (debug, info, warn, error) |
+| `AUDIO_TEMP_DIR` | /tmp/just-audio | Temporary directory for audio processing |
+| `AUDIO_QUALITY` | 0 | Audio quality preset (0=best, higher=faster) |
+| `MAX_DURATION` | 3600 | Maximum allowed video duration in seconds |
+| `MAX_FILE_SIZE` | 500 | Maximum file size in MB |
+| `CORS_ORIGIN` | * | CORS origin setting (use specific domain in production) |
 
 ## Technical Notes
 
@@ -374,15 +347,25 @@ Key flag: `-movflags frag_keyframe+empty_moov`
 
 This was essential to make FFmpeg work with Node.js PassThrough streams piped to HTTP responses.
 
-### yt-dlp JavaScript Runtime
+### youtube-dl-exec Setup
 
-The bundled yt-dlp (v2026.03.17) requires JavaScript runtime for modern YouTube extraction:
+The API uses the `youtube-dl-exec` NPM package which handles YouTube audio extraction. This is bundled and requires no system-level yt-dlp installation:
 
 ```bash
-yt-dlp --js-runtimes node --format bestaudio/best -o - URL
+npm install youtube-dl-exec
 ```
 
-Without `--js-runtimes node`, extraction silently fails because the default runtime is Deno.
+The package automatically manages the YouTube-DL binary and JavaScript runtime for modern video extraction.
+
+### FFmpeg Installation
+
+FFmpeg is installed via the `@ffmpeg-installer/ffmpeg` NPM package, providing cross-platform FFmpeg binary management:
+
+```bash
+npm install @ffmpeg-installer/ffmpeg
+```
+
+This handles FFmpeg setup for encoding audio streams without requiring system-level FFmpeg installation (though it's recommended to have FFmpeg installed for better compatibility).
 
 ## Running in Monorepo
 
