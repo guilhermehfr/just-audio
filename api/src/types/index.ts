@@ -35,14 +35,8 @@ export interface AudioExtractionResponse {
   thumbnail: string
   trackingId?: string
   audioUrl?: string
-  progress?: string
   trimmed?: boolean
   trimmedDuration?: number
 }
 
-export interface ProgressData {
-  trackingId: string
-  progress: string
-  status: 'pending' | 'downloading' | 'processing' | 'complete' | 'error'
-  error?: string
-}
+

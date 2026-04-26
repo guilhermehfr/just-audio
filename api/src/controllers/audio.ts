@@ -3,28 +3,14 @@ import {
   ApiResponse,
   AudioExtractionRequest,
   AudioExtractionResponse,
-  ProgressData,
 } from '../types'
 import { ApiError } from '../middleware/errorHandler'
 import { AudioExtractionService } from '../services/AudioExtractionService'
-import { ProgressService } from '../services/ProgressService'
 import { createAudioStream as createFFmpegStream } from '../utils/ffmpeg-stream'
 
-/**
- * AudioController - Handle audio extraction endpoints
- * Streams audio directly from yt-dlp → FFmpeg → HTTP response
- */
 export class AudioController {
-  constructor(
-    private audioExtractionService: AudioExtractionService,
-    private progressService: ProgressService
-  ) {}
+  constructor(private audioExtractionService: AudioExtractionService) {}
 
-  /**
-   * Get audio info - Fetch video metadata without initiating extraction
-   * @param url - Video URL (required, from body)
-   * @returns metadata object with title, duration, thumbnail
-   */
   async getAudioInfo(req: Request, res: Response): Promise<void> {
     try {
       const { url } = req.body
@@ -51,14 +37,6 @@ export class AudioController {
     }
   }
 
-  /**
-   * Extract audio - Initiate extraction workflow and return trackingId
-   * Generates unique trackingId for progress polling and downloading
-   * @param url - Video URL (required, from body)
-   * @param trackingId - Custom tracking ID (optional, from body; auto-generated if omitted)
-   * @returns metadata + audioUrl (with trackingId) + initial progress
-   * @workflow Start here → Poll /progress/:trackingId → Call /stream/:trackingId to download
-   */
   async extractAudio(req: Request, res: Response): Promise<void> {
     const trackingId = this.generateTrackingId(req.body.trackingId)
 
@@ -66,8 +44,6 @@ export class AudioController {
       const { url } = req.body as AudioExtractionRequest
 
       this.audioExtractionService.validateUrl(url)
-
-      await this.audioExtractionService.initializeStreaming(trackingId)
 
       const metadata = await this.audioExtractionService.fetchMetadata(url)
 
@@ -79,31 +55,18 @@ export class AudioController {
           thumbnail: metadata.thumbnail,
           audioUrl: `/api/audio/stream/${trackingId}`,
           trackingId,
-          progress: '0%',
         },
         timestamp: new Date().toISOString(),
       }
 
       res.json(response)
     } catch (error) {
-      if (trackingId) {
-        await this.audioExtractionService.handleStreamingError(trackingId, error)
-      }
-
       if (error instanceof ApiError) throw error
       console.log('Unexpected error in extractAudio', error)
       throw new ApiError('INTERNAL_ERROR', 'Failed to extract audio')
     }
   }
 
-  /**
-   * Stream audio - Download audio from URL using trackingId for progress tracking
-   * Pipes: yt-dlp video stream → FFmpeg audio processing → HTTP response as M4A file
-   * @param trackingId - Tracking ID from POST /extract response (required, from params)
-   * @param url - Video URL (required, from query string)
-   * @returns binary M4A audio file + progress updates via trackingId
-   * @workflow Call after POST /extract and optional /progress polling
-   */
   async streamAudio(req: Request, res: Response): Promise<void> {
     const trackingId = req.params.trackingId as string
 
@@ -117,16 +80,7 @@ export class AudioController {
         throw new ApiError('MISSING_URL', 'URL is required as query parameter')
       }
 
-      await this.audioExtractionService.updateStreamProgress(trackingId, 'Starting download...')
-
-      const { stream: ytdlpStream } = await this.audioExtractionService.createReadableAudioStream(
-        url,
-        async (progress) => {
-          await this.audioExtractionService.updateStreamProgress(trackingId, progress)
-        }
-      )
-
-      await this.audioExtractionService.updateStreamProgress(trackingId, 'Processing audio...')
+      const { stream: ytdlpStream } = await this.audioExtractionService.createReadableAudioStream(url)
 
       const { stream: ffmpegStream } = createFFmpegStream(ytdlpStream)
 
@@ -135,10 +89,8 @@ export class AudioController {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
       res.setHeader('Transfer-Encoding', 'chunked')
 
-      // Track if headers are sent
       let headersSent = false
 
-      // Listen for stream data to confirm flow
       ffmpegStream.on('data', (chunk) => {
         if (!headersSent) {
           headersSent = true
@@ -146,15 +98,13 @@ export class AudioController {
         }
       })
 
-      // Pipe FFmpeg output to HTTP response
       ffmpegStream.pipe(res)
 
-      ffmpegStream.on('end', async () => {
+      ffmpegStream.on('end', () => {
         console.log(`Stream completed for ${trackingId}`)
-        await this.audioExtractionService.completeStreaming(trackingId)
       })
 
-      ffmpegStream.on('error', async (error) => {
+      ffmpegStream.on('error', (error) => {
         console.log('FFmpeg stream error', {
           trackingId,
           error: error instanceof Error ? error.message : String(error),
@@ -166,7 +116,6 @@ export class AudioController {
             timestamp: new Date().toISOString(),
           })
         }
-        await this.audioExtractionService.handleStreamingError(trackingId, error)
       })
 
       ytdlpStream.on('error', (error) => {
@@ -180,7 +129,7 @@ export class AudioController {
         console.log('Response stream error', { trackingId, error: error.message })
       })
 
-      res.on('close', async () => {
+      res.on('close', () => {
         console.log(`Stream closed for ${trackingId}`)
         if (!ffmpegStream.destroyed) {
           ffmpegStream.destroy()
@@ -188,10 +137,6 @@ export class AudioController {
       })
     } catch (error) {
       if (error instanceof ApiError) throw error
-
-      if (trackingId) {
-        await this.audioExtractionService.handleStreamingError(trackingId, error)
-      }
 
       if (!res.headersSent) {
         console.log('Unexpected error in streamAudio', {
@@ -203,43 +148,6 @@ export class AudioController {
     }
   }
 
-  /**
-   * Get progress - Poll extraction/streaming status
-   * @param trackingId - Tracking ID from POST /extract response (required, from params)
-   * @returns { trackingId, progress percentage, status, error (if failed) }
-   * @note Poll periodically (e.g., every 500ms) to monitor real-time progress
-   */
-  async getProgress(req: Request, res: Response): Promise<void> {
-    try {
-      const trackingId = req.params.trackingId as string
-
-      if (!trackingId) {
-        throw new ApiError('MISSING_TRACKING_ID', 'trackingId is required')
-      }
-
-      const progress = await this.progressService.getProgress(trackingId)
-
-      if (!progress) {
-        throw new ApiError('NOT_FOUND', 'No progress data found for this trackingId')
-      }
-
-      const response: ApiResponse<ProgressData> = {
-        success: true,
-        data: progress,
-        timestamp: new Date().toISOString(),
-      }
-
-      res.json(response)
-    } catch (error) {
-      if (error instanceof ApiError) throw error
-      console.log('Unexpected error in getProgress', error)
-      throw new ApiError('INTERNAL_ERROR', 'Failed to get progress')
-    }
-  }
-
-  /**
-   * Generate or use provided tracking ID
-   */
   private generateTrackingId(provided?: string): string {
     if (provided) return provided
     return `audio-${Date.now()}-${Math.random().toString(36).slice(7)}`
