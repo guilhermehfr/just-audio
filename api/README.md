@@ -1,383 +1,211 @@
 # Just Audio API
 
-Production-ready Express.js API for audio extraction and streaming from YouTube, Vimeo, and other video platforms.
+Express.js API for extracting and streaming audio from YouTube videos via HLS.
 
-## Status
-
-✅ **API is operational** with all core routes tested and validated.
-
-- ✅ YouTube metadata extraction
-- ✅ Audio streaming (zero-disk I/O with FFmpeg piping)
-- ✅ Service/Repository/DI architecture
-- ✅ Full TypeScript strict mode
-- ✅ Unit tests with Vitest
-
-## Directory Structure
-
-```
-src/
-├── controllers/      # HTTP request handlers
-├── services/         # Business logic & orchestration
-├── repositories/     # Data abstraction layer
-├── middleware/       # Express middleware (error handling)
-├── routes/          # Route definitions with DI wiring
-├── types/           # TypeScript interfaces & types
-├── utils/           # Utilities (yt-dlp, FFmpeg, etc.)
-├── app.ts           # Express app setup
-└── server.ts        # Server initialization
-```
-
-## Getting Started
-
-### Prerequisites
-- Node.js 18+
-- pnpm (or npm)
-
-### Installation
+## Quickstart
 
 ```bash
-cd api
-pnpm install
-```
-
-### Environment Setup
-
-Create a `.env` file in the `api/` directory (copy from `.env.example`):
-
-```bash
-cp .env.example .env
-```
-
-Default values:
-- `NODE_ENV=development`
-- `PORT=3000`
-- `LOG_LEVEL=info`
-
-### Development
-
-Run with hot reload:
-
-```bash
+# 1. Start the server
 pnpm run dev
+
+# 2. Start extraction
+curl -X POST http://localhost:3000/api/audio \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}'
+
+# 3. Poll for audio (until 200)
+curl -o playlist.m3u8 http://localhost:3000/api/audio/audio-dQw4w9WgXcQ/playlist.m3u8
 ```
 
-### Production
+## API Reference
 
-Build and start:
+### POST /api/audio
 
-```bash
-pnpm run build
-pnpm run start
-```
+Inicia extração de áudio do YouTube. Retorna imediatamente — o processamento ocorre em background.
 
-Or in one command:
+**Request:**
 
-```bash
-pnpm run start:prod
-```
-
-## Available Scripts
-
-- `pnpm run dev` — Start dev server with watch mode
-- `pnpm run build` — Build TypeScript to `dist/`
-- `pnpm run start` — Start production server
-- `pnpm run start:prod` — Build and start in one command
-- `pnpm run test` — Run unit tests with Vitest
-- `pnpm run lint` — Run ESLint
-- `pnpm run lint:fix` — Fix ESLint issues automatically
-- `pnpm run type-check` — Type check without emitting files
-
-## API Endpoints
-
-All endpoints use JSON request/response format and return standard envelope with `success`, `data`, and `timestamp` fields.
-
-### Audio Extraction & Streaming
-
-#### Get Video Metadata
-
-Fetch metadata without extracting audio.
-
-```
-POST /api/audio/info
-Content-Type: application/json
-
+```json
 {
-  "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+  "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 }
 ```
 
-**Response (200 OK):**
+**Response (200):**
+
 ```json
 {
   "success": true,
   "data": {
-    "title": "Me at the zoo",
-    "duration": 19,
-    "thumbnail": "https://i.ytimg.com/vi/jNQXAC9IVRw/hqdefault.jpg?..."
+    "trackingId": "audio-dQw4w9WgXcQ",
+    "title": "Rick Astley - Never Gonna Give You Up",
+    "duration": 213
   },
-  "timestamp": "2026-04-16T22:10:00.000Z"
+  "timestamp": "2026-04-26T21:44:00.000Z"
 }
 ```
 
-#### Extract Audio (Streaming)
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `trackingId` | string | ID para polling (formato: `audio-{videoId}`) |
+| `title` | string | Título do vídeo |
+| `duration` | number | Duração em segundos |
 
-Initiate audio extraction. Returns immediately with a streaming URL. Extraction happens asynchronously.
+**Erros:**
 
+| Código | HTTP | Descrição |
+|--------|------|-----------|
+| `MISSING_URL` | 400 | URL não fornecida |
+| `INVALID_URL` | 400 | URL não é do YouTube |
+| `FETCH_FAILED` | 502 | Falha ao buscar metadados |
+| `PROCESSING_FAILED` | 500 | Falha no processamento |
+
+---
+
+### GET /api/audio/:trackingId/:file
+
+Stream de áudio via HLS. O primeiro segmento fica disponível após alguns segundos — faça polling até receber 200.
+
+| Parâmetro | Tipo | Descrição |
+|-----------|------|-----------|
+| `trackingId` | string | ID retornado pelo POST |
+| `file` | string | `playlist.m3u8` ou `segment_000.ts` |
+
+**Response:**
+
+- `playlist.m3u8` → `Content-Type: application/vnd.apple.mpegurl`
+- `segment_*.ts` → `Content-Type: video/mp2t`
+
+**Exemplo:**
+
+```bash
+# Poll until ready
+until curl -s -o /dev/null -w "%{http_code}" \
+  http://localhost:3000/api/audio/audio-dQw4w9WgXcQ/playlist.m3u8 \
+  | grep -q 200; do
+  sleep 2
+done
+
+# Download
+curl http://localhost:3000/api/audio/audio-dQw4w9WgXcQ/playlist.m3u8
 ```
-POST /api/audio/extract
-Content-Type: application/json
 
-{
-  "url": "https://www.youtube.com/watch?v=jNQXAC9IVRw"
-}
-```
+**Erros:**
 
-**Response (200 OK):**
+| Código | HTTP | Descrição |
+|--------|------|-----------|
+| `MISSING_PARAMETERS` | 400 | trackingId ou file não fornecido |
+| `NOT_FOUND` | 404 | Arquivo não encontrado |
+| `INTERNAL_ERROR` | 500 | Erro inesperado |
+
+---
+
+## Formato de Resposta
+
+Todas respostas seguem o mesmo envelope:
+
+**Sucesso:**
+
 ```json
 {
   "success": true,
-  "data": {
-    "title": "Me at the zoo",
-    "duration": 19,
-    "thumbnail": "https://i.ytimg.com/vi/jNQXAC9IVRw/hqdefault.jpg?...",
-    "audioUrl": "/api/audio/stream/audio-1776377416099-9n511f",
-    "trackingId": "audio-1776377416099-9n511f"
-  },
-  "timestamp": "2026-04-16T22:10:00.000Z"
+  "data": { ... },
+  "timestamp": "2026-04-26T21:44:00.000Z"
 }
 ```
 
-**Parameters:**
-- `url` (required) — Video URL (YouTube, Vimeo, Dailymotion, etc.)
-
-#### Stream Audio File
-
-Download the extracted audio (M4A format).
-
-```
-GET /api/audio/stream/{trackingId}?url=https://www.youtube.com/watch?v=jNQXAC9IVRw
-```
-
-**Response (200 OK):**
-- Headers:
-  - `Content-Type: audio/mp4`
-  - `Content-Disposition: attachment; filename="audio-{trackingId}.m4a"`
-- Body: Binary M4A audio data (~300KB for typical 19-second video)
-
-**Note:** The `url` query parameter is required to stream the audio.
-
-### Response Format
-
-All successful responses follow this envelope:
-
-```json
-{
-  "success": true,
-  "data": { /* response data */ },
-  "timestamp": "2026-04-16T22:10:00.000Z"
-}
-```
-
-Error responses:
+**Erro:**
 
 ```json
 {
   "success": false,
   "error": {
     "code": "ERROR_CODE",
-    "message": "Human-readable error message"
+    "message": "Mensagem legível"
   },
-  "timestamp": "2026-04-16T22:10:00.000Z"
+  "timestamp": "2026-04-26T21:44:00.000Z"
 }
 ```
 
-### Error Codes
+---
 
-- `MISSING_URL` — URL parameter not provided (400)
-- `INVALID_URL` — URL is not a supported video platform (400)
-- `MISSING_TRACKING_ID` — Tracking ID parameter not provided (400)
-- `FETCH_FAILED` — Failed to fetch video metadata (400)
-- `STREAM_ERROR` — Failed to create audio stream (500)
-- `INTERNAL_ERROR` — Unexpected server error (500)
+## Variáveis de Ambiente
 
-## Features
+| Variável | Obrigatório | Padrão | Descrição |
+|----------|:-----------:|--------|----------|
+| `PORT` | | 3000 | Porta do servidor |
+| `NODE_ENV` | | development | Ambiente |
+| `MINIO_ENDPOINT` | ✓ | - | Endpoint S3/MinIO |
+| `MINIO_ACCESS_KEY` | ✓ | - | Access key S3 |
+| `MINIO_SECRET_KEY` | ✓ | - | Secret key S3 |
+| `MINIO_BUCKET` | ✓ | - | Bucket S3 |
+| `MINIO_REGION` | | auto | Região S3 |
+| `AUDIO_TEMP_DIR` | ✓ | - | Diretório temporário |
+| `MAX_DURATION` | | 14400 | Duração máx (segundos) |
+| `MAX_FILE_SIZE` | | 500 | Tamanho máx (MB) |
+| `AUDIO_TTL` | | 86400 | TTL do áudio (segundos) |
+| `CORS_ORIGIN` | | * | Origem CORS |
 
-- ✅ **Express.js 5.x** with TypeScript strict mode
-- ✅ **YouTube/Vimeo audio extraction** using youtube-dl-exec NPM package
-- ✅ **FFmpeg streaming** with non-seekable output support (`-movflags frag_keyframe+empty_moov`)
-- ✅ **Zero-disk I/O architecture** (youtube-dl → FFmpeg → HTTP response piping)
-- ✅ **Service/Repository/DI pattern** for clean separation of concerns
-- ✅ **Structured error handling** with custom `ApiError` class
-- ✅ **CORS middleware** with configurable origin
-- ✅ **Graceful shutdown** on SIGTERM/SIGINT
-- ✅ **Full TypeScript compilation** with no errors
-- ✅ **ESLint & Prettier** for code quality
+---
 
-## Architecture
-
-### Service/Repository/Dependency Injection Pattern
-
-**AudioController** → orchestrates HTTP requests
-
-↓
-
-**AudioExtractionService** → handles business logic (validation, metadata, streaming)
-
-↓
-
-**yt-dlp utility** → spawns YouTube audio extraction process
-
-↓
-
-**FFmpeg utility** → pipes audio through FFmpeg for encoding
-
-### Key Components
-
-- **AudioController** ([controllers/audio.ts](src/controllers/audio.ts))
-  - Handles 3 HTTP endpoints
-  - Delegates business logic to services
-  - Manages streaming responses
-
-- **AudioExtractionService** ([services/AudioExtractionService.ts](src/services/AudioExtractionService.ts))
-  - URL validation
-  - Metadata fetching via yt-dlp
-  - Audio stream creation and piping
-
-- **youtube-dl utility** ([utils/youtube-dl.ts](src/utils/youtube-dl.ts))
-  - Uses youtube-dl-exec NPM package for video audio extraction
-  - Handles JavaScript runtime configuration automatically
-  - Returns readable stream for audio data
-
-- **FFmpeg utility** ([utils/ffmpeg-stream.ts](src/utils/ffmpeg-stream.ts))
-  - Spawns FFmpeg process directly (not fluent-ffmpeg)
-  - Pipes yt-dlp output → FFmpeg stdin → PassThrough → HTTP response
-  - Uses `-movflags frag_keyframe+empty_moov` for streaming to non-seekable output
-  - Converts audio to M4A (AAC codec, 128k bitrate, 44100Hz)
-
-### Data Flow
+## Arquitetura
 
 ```
-Client Request
-    ↓
-Express Route → AudioController
-    ↓
-AudioExtractionService (validates, fetches metadata, initiates streaming)
-    ↓
-youtube-dl-exec Process (downloads audio from YouTube)
-    ↓
-FFmpeg Process (encodes to M4A)
-    ↓
-PassThrough Stream
-    ↓
-HTTP Response ← Client receives audio file
+┌────────────┐     ┌──────────────────┐     ┌─────────────┐
+│   Client   │────▶│  AudioController │────▶│ yt-dlp      │
+└────────────┘     └──────────────────┘     └─────────────┘
+                           │                          │
+                           ▼                          ▼
+                    ┌──────────────────┐     ┌─────────────┐
+                    │  AudioExtraction │────▶│  FFmpeg     │
+                    │  Service         │     │ (HLS seg)   │
+                    └──────────────────┘     └─────────────┘
+                           │                          │
+                           ▼                          ▼
+                    ┌─────────────────┐     ┌─────────────┐
+                    │ AudioStorage    │◀────│  S3/MinIO   │
+                    │ (downloadFile)  │     └─────────────┘
+                    └─────────────────┘
 ```
 
-### Middleware
+### Fire and Forget + Short-Polling
 
-- **Error Handler** ([middleware/errorHandler.ts](src/middleware/errorHandler.ts))
-  - Catches all errors and returns structured JSON responses
-  - Uses console.log for error tracking
+1. **POST** retorna antes do processamento terminar
+2. Cliente faz **polling no GET** até 200
+3. **404** = FFmpeg ainda não escreveu o primeiro segmento
+4. **200** = primeiro segmento disponível
 
-## Testing
+---
 
-All 3 routes have 9 unit tests covering success cases and validation:
+## Scripts
+
+| Comando | Descrição |
+|---------|-----------|
+| `pnpm run dev` | Desenvolvimento com hot reload |
+| `pnpm run build` | Compila TypeScript |
+| `pnpm run start` | Inicia produção |
+| `pnpm run test` | Testes unitários |
+| `pnpm run test:route` | Testes de rota |
+| `pnpm run lint` | ESLint |
+
+---
+
+## Estrutura
 
 ```
-✅ POST /api/audio/info        (metadata extraction)
-✅ POST /api/audio/extract    (streaming initialization)
-✅ GET /api/audio/stream/:id  (validation & error handling)
-```
-
-Test file: [src/routes/audio.test.ts](src/routes/audio.test.ts)
-
-## Implementation Status
-
-### ✅ Completed
-- [x] Audio metadata extraction (`POST /api/audio/info`)
-- [x] Audio streaming (`POST /api/audio/extract` + `GET /api/audio/stream/:id`)
-- [x] YouTube/Vimeo support (youtube-dl-exec integration)
-- [x] FFmpeg streaming with non-seekable output support
-- [x] Service/Repository/DI architecture
-- [x] Error handling middleware
-- [x] CORS middleware with configurable origin
-- [x] TypeScript strict mode
-- [x] ESLint configuration
-- [x] Prettier code formatting
-- [x] All routes tested with real YouTube videos
-
-### 🔮 Future Enhancements
-- [ ] Redis integration for production-grade progress tracking
-- [ ] Database persistence for extraction history
-- [ ] Audio trimming/cutting support
-- [ ] Multiple format output (MP3, WAV, etc.)
-- [ ] Rate limiting & request validation
-- [ ] Authentication & authorization
-- [ ] File upload management routes
-- [ ] S3 integration for file storage
-- [ ] WebSocket support for real-time progress updates
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `NODE_ENV` | development | Environment (development \| production) |
-| `PORT` | 3000 | Server port |
-| `LOG_LEVEL` | info | Logging level (debug, info, warn, error) |
-| `AUDIO_TEMP_DIR` | /tmp/just-audio | Temporary directory for audio processing |
-| `AUDIO_QUALITY` | 0 | Audio quality preset (0=best, higher=faster) |
-| `MAX_DURATION` | 3600 | Maximum allowed video duration in seconds |
-| `MAX_FILE_SIZE` | 500 | Maximum file size in MB |
-| `CORS_ORIGIN` | * | CORS origin setting (use specific domain in production) |
-
-## Technical Notes
-
-### FFmpeg Streaming to Non-Seekable Output
-
-The M4A format (ISO Base Media File Format) requires seeking in output files. When piping to stdout (HTTP response), the output is non-seekable. To solve this:
-
-```bash
-ffmpeg -i pipe:0 -c:a aac -b:a 128k -ar 44100 \
-  -movflags frag_keyframe+empty_moov \
-  -f ipod pipe:1
-```
-
-Key flag: `-movflags frag_keyframe+empty_moov`
-- `frag_keyframe` — Fragment output at keyframes
-- `empty_moov` — Emit empty moov atom upfront (allows streaming before file is complete)
-
-This was essential to make FFmpeg work with Node.js PassThrough streams piped to HTTP responses.
-
-### youtube-dl-exec Setup
-
-The API uses the `youtube-dl-exec` NPM package which handles YouTube audio extraction. This is bundled and requires no system-level yt-dlp installation:
-
-```bash
-npm install youtube-dl-exec
-```
-
-The package automatically manages the YouTube-DL binary and JavaScript runtime for modern video extraction.
-
-### FFmpeg Installation
-
-FFmpeg is installed via the `@ffmpeg-installer/ffmpeg` NPM package, providing cross-platform FFmpeg binary management:
-
-```bash
-npm install @ffmpeg-installer/ffmpeg
-```
-
-This handles FFmpeg setup for encoding audio streams without requiring system-level FFmpeg installation (though it's recommended to have FFmpeg installed for better compatibility).
-
-## Running in Monorepo
-
-This API is part of the Just Audio monorepo. Commands:
-
-```bash
-# From repository root
-pnpm --filter api run dev
-pnpm --filter api run build
-pnpm --filter api run start
-
-# From api/ directory
-cd api
-pnpm run dev
+src/
+├── app.ts                 # Express setup
+├── server.ts              # Entry point
+├── controllers/audio.ts    # HTTP handlers
+├── services/
+│   ├── AudioExtraction.ts # Lógica de extração
+│   └── AudioStorage.ts   # Upload/download S3
+├── routes/audio.ts       # Definição de rotas
+├── middleware/errorHandler.ts # ApiError
+├── config/env.ts         # Environment
+├── lib/s3.ts            # S3Client
+├── types/index.ts       # Interfaces
+└── utils/
+    ├── youtube-dl.ts    # yt-dlp spawn
+    └── ffmpeg-stream.ts # HLS segmentation
 ```
