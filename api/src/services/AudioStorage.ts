@@ -1,13 +1,10 @@
 import { GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3'
 import { s3 } from '../lib/s3'
+import { env } from '../config/env'
 
 export async function downloadFile(key: string): Promise<Buffer> {
-  if (!process.env.MINIO_BUCKET) {
-    throw new Error('Missing MINIO_BUCKET environment variable')
-  }
-
   const command = new GetObjectCommand({
-    Bucket: process.env.MINIO_BUCKET,
+    Bucket: env.minio.bucket,
     Key: key,
   })
 
@@ -21,13 +18,9 @@ export async function downloadFile(key: string): Promise<Buffer> {
 }
 
 export async function uploadFile(key: string, body: Buffer | Uint8Array, contentType: string) {
-  if (!process.env.MINIO_BUCKET) {
-    throw new Error('Missing MINIO_BUCKET environment variable')
-  }
-
   await s3.send(
     new PutObjectCommand({
-      Bucket: process.env.MINIO_BUCKET,
+      Bucket: env.minio.bucket,
       Key: key,
       Body: body,
       ContentType: contentType,

@@ -1,7 +1,8 @@
 import cors from 'cors'
+import { env } from '../config/env'
 
 const corsOptions = {
-  origin: process.env.CORS_ORIGIN,
+  origin: env.cors.origin,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],

@@ -1,7 +1,9 @@
-import app from './app'
-import config from './config'
+import 'dotenv/config'
 
-const port = config.port
+import app from './app'
+import { env } from './config/env'
+
+const port = env.server.port
 
 const server = app.listen(port, () => {
   console.log(`Server running on port ${port}`)
