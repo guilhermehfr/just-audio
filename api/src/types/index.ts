@@ -11,7 +11,6 @@ export interface ApiResponse<T = unknown> {
 export interface AudioMetadata {
   title: string
   duration: number
-  thumbnail: string
   width?: number
   height?: number
   format?: string
@@ -32,11 +31,8 @@ export interface AudioExtractionRequest {
 export interface AudioExtractionResponse {
   title: string
   duration: number
-  thumbnail: string
   trackingId?: string
   audioUrl?: string
   trimmed?: boolean
   trimmedDuration?: number
 }
-
-

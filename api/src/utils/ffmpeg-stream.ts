@@ -1,84 +1,80 @@
+import fs from 'node:fs/promises'
+import path from 'node:path'
 import { spawn } from 'child_process'
-import { Readable, PassThrough } from 'stream'
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg'
+import { Readable } from 'stream'
+import { uploadFile } from '../services/AudioStorage'
 
-interface AudioStreamOptions {
-  bitrate?: string
-  format?: string
-  sampleRate?: number
+export async function segmentAudioToHLS(
+  audioStream: Readable,
+  trackingId: string,
+  outputDir: string,
+  durationSeconds: number
+): Promise<void> {
+  return segmentAudioToHLSInternal(audioStream, trackingId, outputDir, durationSeconds)
 }
 
-/**
- * Create audio stream by piping input through FFmpeg using spawn
- * More reliable than fluent-ffmpeg for piping scenarios
- * @param inputStream - Readable stream (from yt-dlp or other source)
- * @param options - FFmpeg encoding options
- * @returns Readable stream of processed audio
- */
-export function createAudioStream(
-  inputStream: Readable,
-  options: AudioStreamOptions = {}
-): { stream: Readable } {
-  const { bitrate = '192k', format = 'aac', sampleRate = 44100 } = options
+export async function segmentAudioToHLSInternal(
+  audioStream: Readable,
+  trackingId: string,
+  outputDir: string,
+  durationSeconds: number
+): Promise<void> {
+  await fs.mkdir(outputDir, { recursive: true })
 
-  // FFmpeg command args for M4A audio conversion
-  // frag_keyframe: Creates fragmented MP4 suitable for streaming
-  const ffmpegArgs = [
-    '-i',
-    'pipe:0', // Read from stdin
-    '-c:a',
-    format, // Audio codec (aac)
-    '-b:a',
-    bitrate, // Bitrate (192k default - high quality)
-    '-ar',
-    String(sampleRate), // Sample rate (44100)
-    '-movflags',
-    'frag_keyframe', // Fragmented MP4 for proper streaming
-    '-f',
-    'ipod', // Output format (M4A)
-    'pipe:1', // Write to stdout
-  ]
+  return new Promise((resolve, reject) => {
+    const segmentsDuration = getSegmentsDuration(durationSeconds).toString()
 
-  const ffmpeg = spawn(ffmpegInstaller.path, ffmpegArgs, {
-    stdio: ['pipe', 'pipe', 'pipe'],
+    const ffmpeg = spawn('ffmpeg', [
+      '-i',
+      'pipe:0',
+      '-c:a',
+      'aac',
+      '-b:a',
+      '128k',
+      '-hls_time',
+      segmentsDuration,
+      '-hls_list_size',
+      '0',
+      '-hls_segment_filename',
+      `${outputDir}/segment_%03d.ts`,
+      `${outputDir}/playlist.m3u8`,
+    ])
+
+    audioStream.pipe(ffmpeg.stdin)
+
+    ffmpeg.stdin.on('error', reject)
+
+    ffmpeg.on('close', async (code) => {
+      if (code !== 0) return reject(new Error(`ffmpeg exited with code ${code}`))
+
+      try {
+        const files = await fs.readdir(outputDir)
+
+        await Promise.all(
+          files.map(async (filename) => {
+            console.log(`Uploading ${filename} to S3...`)
+            const data = await fs.readFile(path.join(outputDir, filename))
+            const contentType = filename.endsWith('.m3u8')
+              ? 'application/vnd.apple.mpegurl'
+              : 'video/mp2t'
+            await uploadFile(`${trackingId}/${filename}`, data, contentType)
+          })
+        )
+
+        await fs.rm(outputDir, { recursive: true, force: true })
+        resolve()
+      } catch (error) {
+        reject(error)
+      }
+    })
+
+    ffmpeg.on('error', reject)
   })
+}
 
-  // Create output stream - PassThrough allows us to forward data
-  const outputStream = new PassThrough()
-
-  // Pipe FFmpeg stdout to output stream
-  ffmpeg.stdout.pipe(outputStream)
-
-  // Handle errors
-  inputStream.on('error', (error: Error) => {
-    console.log('Input stream error', error.message)
-    ffmpeg.stdin.destroy(error)
-  })
-
-  ffmpeg.on('error', (error: Error) => {
-    console.log('FFmpeg process error', error.message)
-    outputStream.destroy(error)
-  })
-
-  ffmpeg.stdout.on('error', (error: Error) => {
-    console.log('FFmpeg stdout error', error.message)
-    outputStream.destroy(error)
-  })
-
-  ffmpeg.stdin.on('error', (error: Error) => {
-    console.log('FFmpeg stdin error', error.message)
-  })
-
-  // Log FFmpeg errors/warnings
-  ffmpeg.stderr.on('data', (data: Buffer) => {
-    const msg = data.toString()
-    if (msg.includes('error') || msg.includes('Error')) {
-      console.log('FFmpeg warning/error:', msg.trim())
-    }
-  })
-
-  // Pipe input to FFmpeg stdin
-  inputStream.pipe(ffmpeg.stdin)
-
-  return { stream: outputStream }
+export function getSegmentsDuration(durationSeconds: number): number {
+  if (durationSeconds <= 600) return 10 // até 10min → ~60 segmentos
+  if (durationSeconds <= 3600) return 30 // até 1h    → ~120 segmentos
+  if (durationSeconds <= 7200) return 60 // até 2h    → ~120 segmentos
+  return 120 // até 4h    → ~120 segmentos
 }

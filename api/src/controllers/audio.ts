@@ -1,155 +1,110 @@
 import { Request, Response } from 'express'
-import {
-  ApiResponse,
-  AudioExtractionRequest,
-  AudioExtractionResponse,
-} from '../types'
+import path from 'node:path'
+import fs from 'node:fs/promises'
 import { ApiError } from '../middleware/errorHandler'
-import { AudioExtractionService } from '../services/AudioExtractionService'
-import { createAudioStream as createFFmpegStream } from '../utils/ffmpeg-stream'
+import { AudioExtractionService } from '../services/AudioExtraction'
+import { downloadFile } from '../services/AudioStorage'
+import { isValidVideoUrl } from '@/utils/youtube-dl'
+import { env } from '../config/env'
+
+interface PostAudioBody {
+  url: string
+}
+
+interface GetAudioParams {
+  trackingId: string
+  file: string
+}
 
 export class AudioController {
   constructor(private audioExtractionService: AudioExtractionService) {}
 
-  async getAudioInfo(req: Request, res: Response): Promise<void> {
+  async postAudio(req: Request<{}, {}, PostAudioBody>, res: Response): Promise<void> {
     try {
       const { url } = req.body
 
-      this.audioExtractionService.validateUrl(url)
+      if (!url) throw new ApiError('MISSING_URL', 'URL is required')
 
+      const trackingId = this.generateTrackingId(url)
       const metadata = await this.audioExtractionService.fetchMetadata(url)
 
-      const response: ApiResponse<AudioExtractionResponse> = {
+      const alreadyProcessed = await downloadFile(`${trackingId}/playlist.m3u8`)
+        .then((data) => data !== null)
+        .catch(() => false)
+
+      if (!alreadyProcessed) {
+        try {
+          this.audioExtractionService.processAudio(url, trackingId, metadata.duration)
+        } catch (error: Error | unknown) {
+          throw new ApiError(
+            'PROCESSING_FAILED',
+            error instanceof Error ? error.message : 'Processing failed'
+          )
+        }
+      }
+
+      res.json({
         success: true,
         data: {
+          trackingId,
           title: metadata.title,
           duration: metadata.duration,
-          thumbnail: metadata.thumbnail,
         },
         timestamp: new Date().toISOString(),
-      }
-
-      res.json(response)
+      })
     } catch (error) {
       if (error instanceof ApiError) throw error
-      console.log('Unexpected error in getAudioInfo', error)
-      throw new ApiError('INTERNAL_ERROR', 'Failed to fetch audio info')
+      console.error('Unexpected error in postAudio', error)
+      throw new ApiError('INTERNAL_ERROR', 'Failed to process audio')
     }
   }
 
-  async extractAudio(req: Request, res: Response): Promise<void> {
-    const trackingId = this.generateTrackingId(req.body.trackingId)
-
+  async getAudio(req: Request<GetAudioParams>, res: Response): Promise<void> {
     try {
-      const { url } = req.body as AudioExtractionRequest
+      const { trackingId, file } = req.params
 
-      this.audioExtractionService.validateUrl(url)
+      if (!trackingId || !file)
+        throw new ApiError('MISSING_PARAMETERS', 'Missing tracking ID or filename')
 
-      const metadata = await this.audioExtractionService.fetchMetadata(url)
+      const contentType = file.endsWith('.m3u8') ? 'application/vnd.apple.mpegurl' : 'video/mp2t'
 
-      const response: ApiResponse<AudioExtractionResponse> = {
-        success: true,
-        data: {
-          title: metadata.title,
-          duration: metadata.duration,
-          thumbnail: metadata.thumbnail,
-          audioUrl: `/api/audio/stream/${trackingId}`,
-          trackingId,
-        },
-        timestamp: new Date().toISOString(),
+      try {
+        const data = await downloadFile(`${trackingId}/${file}`)
+        if (data) {
+          res.setHeader('Content-Type', contentType)
+          res.send(data)
+          return
+        }
+      } catch {}
+
+      // fallback: /tmp
+      const tmpPath = path.join(env.audio.tempDir, trackingId, file)
+      try {
+        const data = await fs.readFile(tmpPath)
+        res.setHeader('Content-Type', contentType)
+        res.send(data)
+        return
+      } catch {
+        throw new ApiError('NOT_FOUND', `File not found: ${file}`)
       }
-
-      res.json(response)
     } catch (error) {
       if (error instanceof ApiError) throw error
-      console.log('Unexpected error in extractAudio', error)
-      throw new ApiError('INTERNAL_ERROR', 'Failed to extract audio')
+      console.error('Unexpected error in getAudio', error)
+      throw new ApiError('INTERNAL_ERROR', 'Failed to stream audio')
     }
   }
 
-  async streamAudio(req: Request, res: Response): Promise<void> {
-    const trackingId = req.params.trackingId as string
+  private generateTrackingId(url: string): string {
+    if (!isValidVideoUrl(url)) throw new ApiError('INVALID_URL', 'Invalid YouTube URL')
 
-    try {
-      if (!trackingId) {
-        throw new ApiError('MISSING_TRACKING_ID', 'trackingId is required')
-      }
+    const domainsRegex =
+      '(?:youtube\\.com\\/(?:watch\\?(?:.*&)?v=|embed\\/|v\\/|vi\\/|shorts\\/|live\\/)|youtu\\.be\\/|youtube-nocookie\\.com\\/embed\\/)'
 
-      const { url } = req.query as { url?: string }
-      if (!url) {
-        throw new ApiError('MISSING_URL', 'URL is required as query parameter')
-      }
+    const regex = new RegExp(`${domainsRegex}([a-zA-Z0-9_-]{11})`)
+    const match = url.match(regex)
 
-      const { stream: ytdlpStream } = await this.audioExtractionService.createReadableAudioStream(url)
+    if (!match) throw new ApiError('INVALID_URL', 'Could not extract video ID from URL')
 
-      const { stream: ffmpegStream } = createFFmpegStream(ytdlpStream)
-
-      res.setHeader('Content-Type', 'audio/mp4')
-      res.setHeader('Content-Disposition', `attachment; filename="audio-${trackingId}.m4a"`)
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
-      res.setHeader('Transfer-Encoding', 'chunked')
-
-      let headersSent = false
-
-      ffmpegStream.on('data', (chunk) => {
-        if (!headersSent) {
-          headersSent = true
-          console.log(`Stream data flowing for ${trackingId}, chunk: ${chunk.length} bytes`)
-        }
-      })
-
-      ffmpegStream.pipe(res)
-
-      ffmpegStream.on('end', () => {
-        console.log(`Stream completed for ${trackingId}`)
-      })
-
-      ffmpegStream.on('error', (error) => {
-        console.log('FFmpeg stream error', {
-          trackingId,
-          error: error instanceof Error ? error.message : String(error),
-        })
-        if (!res.headersSent) {
-          res.status(500).json({
-            success: false,
-            error: { code: 'STREAM_ERROR', message: 'Audio streaming failed' },
-            timestamp: new Date().toISOString(),
-          })
-        }
-      })
-
-      ytdlpStream.on('error', (error) => {
-        console.log('yt-dlp stream error', {
-          trackingId,
-          error: error instanceof Error ? error.message : String(error),
-        })
-      })
-
-      res.on('error', (error) => {
-        console.log('Response stream error', { trackingId, error: error.message })
-      })
-
-      res.on('close', () => {
-        console.log(`Stream closed for ${trackingId}`)
-        if (!ffmpegStream.destroyed) {
-          ffmpegStream.destroy()
-        }
-      })
-    } catch (error) {
-      if (error instanceof ApiError) throw error
-
-      if (!res.headersSent) {
-        console.log('Unexpected error in streamAudio', {
-          trackingId,
-          error: error instanceof Error ? error.message : String(error),
-        })
-        throw new ApiError('INTERNAL_ERROR', 'Failed to stream audio')
-      }
-    }
-  }
-
-  private generateTrackingId(provided?: string): string {
-    if (provided) return provided
-    return `audio-${Date.now()}-${Math.random().toString(36).slice(7)}`
+    return `audio-${match[1]}`
   }
 }
