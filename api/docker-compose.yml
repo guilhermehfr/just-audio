@@ -1,16 +1,50 @@
 services:
+  api:
+    build:
+      context: ..
+      dockerfile: api/Dockerfile
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.docker
+    depends_on:
+      minio:
+        condition: service_started
+    networks:
+      - test-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
   minio:
     image: minio/minio
     container_name: minio
     ports:
-      - "9000:9000"   # S3 API
-      - "9001:9001"   # Web console
+      - "9000:9000"
+      - "9001:9001"
     environment:
       MINIO_ROOT_USER: admin
       MINIO_ROOT_PASSWORD: password123
     command: server /data --console-address ":9001"
     volumes:
       - minio_data:/data
+    networks:
+      - test-net
+
+  k6:
+    image: grafana/k6
+    volumes:
+      - ./tests:/scripts
+    working_dir: /scripts
+    entrypoint: ["k6"]
+    networks:
+      - test-net
 
 volumes:
   minio_data:
+
+networks:
+  test-net:

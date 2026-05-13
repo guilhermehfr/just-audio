@@ -1,8 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { downloadFile, uploadFile } from './AudioStorage'
+import { downloadFile, uploadFile } from '../../services/AudioStorage'
 
-vi.mock('../config/env', () => ({
+vi.mock('../../config/env', () => ({
   env: {
+    audio: {
+      maxConcurrentJobs: 3,
+    },
     minio: {
       bucket: 'test-bucket',
       endpoint: 'http://localhost:9000',
@@ -13,7 +16,7 @@ vi.mock('../config/env', () => ({
   },
 }))
 
-vi.mock('../lib/s3', () => {
+vi.mock('../../lib/s3', () => {
   const mockSend = vi.fn(() => Promise.resolve({}))
   return {
     s3: { send: mockSend },
@@ -21,7 +24,7 @@ vi.mock('../lib/s3', () => {
 })
 
 const getMockSend = async () => {
-  const { s3 } = await import('../lib/s3')
+  const { s3 } = await import('../../lib/s3')
   return vi.mocked(s3.send)
 }
 

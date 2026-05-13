@@ -8,6 +8,7 @@ export const env = {
   server: {
     port: parseInt(process.env.PORT ?? '3000', 10),
     nodeEnv: process.env.NODE_ENV ?? 'development',
+    rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX ?? '10', 10),
   },
   minio: {
     endpoint: required('MINIO_ENDPOINT'),
@@ -21,6 +22,7 @@ export const env = {
     maxDuration: parseInt(process.env.MAX_DURATION ?? '14400', 10),
     maxFileSize: parseInt(process.env.MAX_FILE_SIZE ?? '500', 10),
     ttl: parseInt(process.env.AUDIO_TTL ?? '86400', 10),
+    maxConcurrentJobs: parseInt(process.env.MAX_CONCURRENT_JOBS ?? '3', 10),
   },
   cors: {
     origin: process.env.CORS_ORIGIN ?? '*',

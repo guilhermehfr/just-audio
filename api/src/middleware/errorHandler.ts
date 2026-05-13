@@ -16,6 +16,7 @@ const ERROR_STATUS_MAP: Record<string, number> = {
   INTERNAL_ERROR: 500,
   STREAM_ERROR: 500,
   INTERNAL_SERVER_ERROR: 500,
+  TOO_MANY_REQUESTS: 429,
 }
 
 export class ApiError extends Error {

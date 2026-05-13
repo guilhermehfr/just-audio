@@ -1,19 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { AudioExtractionService } from './AudioExtraction'
-import { ApiError } from '../middleware/errorHandler'
-vi.mock('../config/env', () => ({
+import { AudioExtractionService } from '../../services/AudioExtraction'
+import { ApiError } from '../../middleware/errorHandler'
+vi.mock('../../config/env', () => ({
   env: {
     audio: {
       tempDir: '/tmp/audios',
-      quality: 0,
       maxDuration: 14400,
       maxFileSize: 500,
       ttl: 86400,
+      maxConcurrentJobs: 3,
     },
   },
 }))
 
-vi.mock('../utils/youtube-dl', () => ({
+vi.mock('../../utils/youtube-dl', () => ({
   getVideoMetadata: vi.fn(),
   isValidVideoUrl: vi.fn(),
   createAudioStream: vi.fn(),
@@ -25,11 +25,11 @@ vi.mock('../utils/youtube-dl', () => ({
   },
 }))
 
-vi.mock('../utils/ffmpeg-stream', () => ({
+vi.mock('../../utils/ffmpeg-stream', () => ({
   segmentAudioToHLS: vi.fn(),
 }))
 
-vi.mock('../services/AudioStorage', () => ({
+vi.mock('../../services/AudioStorage', () => ({
   uploadFile: vi.fn().mockResolvedValue(undefined),
 }))
 
@@ -45,17 +45,17 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 
 describe('AudioExtractionService', () => {
   let service: AudioExtractionService
-  let youtubeDl: typeof import('../utils/youtube-dl')
-  let ffmpegStream: typeof import('../utils/ffmpeg-stream')
-  let audioStorage: typeof import('../services/AudioStorage')
+  let youtubeDl: typeof import('../../utils/youtube-dl')
+  let ffmpegStream: typeof import('../../utils/ffmpeg-stream')
+  let audioStorage: typeof import('../../services/AudioStorage')
   let fs: typeof import('node:fs/promises')
 
   beforeEach(async () => {
     vi.clearAllMocks()
     service = new AudioExtractionService()
-    youtubeDl = await import('../utils/youtube-dl')
-    ffmpegStream = await import('../utils/ffmpeg-stream')
-    audioStorage = await import('../services/AudioStorage')
+    youtubeDl = await import('../../utils/youtube-dl')
+    ffmpegStream = await import('../../utils/ffmpeg-stream')
+    audioStorage = await import('../../services/AudioStorage')
     fs = await import('node:fs/promises')
   })
 

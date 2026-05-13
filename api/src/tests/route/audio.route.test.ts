@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import request from 'supertest'
-import app from '../app'
+import app from '../../app'
+import { resetActiveJobs } from '../../controllers/audio'
 
-vi.mock('../config/env', () => ({
+vi.mock('../../config/env', () => ({
   env: {
     audio: {
       tempDir: '/tmp/audios',
@@ -10,6 +11,7 @@ vi.mock('../config/env', () => ({
       maxDuration: 14400,
       maxFileSize: 500,
       ttl: 86400,
+      maxConcurrentJobs: 3,
     },
     minio: {
       bucket: 'test-bucket',
@@ -21,6 +23,7 @@ vi.mock('../config/env', () => ({
     server: {
       port: 3000,
       nodeEnv: 'test',
+      rateLimitMax: 100,
     },
     cors: {
       origin: '*',
@@ -30,28 +33,28 @@ vi.mock('../config/env', () => ({
 
 const { mockFetchMetadata, mockProcessAudio, mockDownloadFile, mockIsValidVideoUrl } = vi.hoisted(
   () => ({
+    mockDownloadFile: vi.fn().mockRejectedValue(new Error('not found')),
     mockFetchMetadata: vi.fn().mockResolvedValue({ title: 'Test Video', duration: 120 }),
     mockProcessAudio: vi.fn().mockResolvedValue(undefined),
-    mockDownloadFile: vi.fn().mockResolvedValue(Buffer.from('mock-audio')),
     mockIsValidVideoUrl: vi.fn().mockReturnValue(true),
   })
 )
 
-vi.mock('../utils/youtube-dl', () => ({
+vi.mock('../../utils/youtube-dl', () => ({
   isValidVideoUrl: mockIsValidVideoUrl,
   YouTubeDLError: class YouTubeDLError extends Error {
     name = 'YouTubeDLError'
   },
 }))
 
-vi.mock('../services/AudioExtraction', () => ({
+vi.mock('../../services/AudioExtraction', () => ({
   AudioExtractionService: class MockAudioExtractionService {
     fetchMetadata = mockFetchMetadata
     processAudio = mockProcessAudio
   },
 }))
 
-vi.mock('../services/AudioStorage', () => ({
+vi.mock('../../services/AudioStorage', () => ({
   downloadFile: mockDownloadFile,
   uploadFile: vi.fn().mockResolvedValue(undefined),
 }))
@@ -59,9 +62,11 @@ vi.mock('../services/AudioStorage', () => ({
 describe('POST /api/audio', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    resetActiveJobs()
     mockFetchMetadata.mockResolvedValue({ title: 'Test Video', duration: 120 })
     mockProcessAudio.mockResolvedValue(undefined)
     mockIsValidVideoUrl.mockReturnValue(true)
+    mockDownloadFile.mockRejectedValue(new Error('not found'))
   })
 
   it('returns 200 with metadata for valid YouTube URL', async () => {
@@ -92,18 +97,6 @@ describe('POST /api/audio', () => {
 
     expect(res.status).toBe(400)
     expect(res.body.error.code).toBe('INVALID_URL')
-  })
-
-  it('returns 500 PROCESSING_FAILED when processAudio throws', async () => {
-    mockProcessAudio.mockRejectedValueOnce(new Error('ffmpeg failed'))
-    mockDownloadFile.mockResolvedValueOnce(null)
-
-    const res = await request(app)
-      .post('/api/audio')
-      .send({ url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' })
-
-    expect(res.status).toBe(500)
-    expect(res.body.error.code).toBe('PROCESSING_FAILED')
   })
 
   it('returns 500 INTERNAL_ERROR on unexpected error', async () => {

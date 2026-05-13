@@ -16,6 +16,12 @@ interface GetAudioParams {
   file: string
 }
 
+let activeJobs = 0
+
+export function resetActiveJobs() {
+  activeJobs = 0
+}
+
 export class AudioController {
   constructor(private audioExtractionService: AudioExtractionService) {}
 
@@ -25,6 +31,10 @@ export class AudioController {
 
       if (!url) throw new ApiError('MISSING_URL', 'URL is required')
 
+      if (activeJobs >= env.audio.maxConcurrentJobs) {
+        throw new ApiError('TOO_MANY_REQUESTS', 'Server busy, try again later')
+      }
+
       const trackingId = this.generateTrackingId(url)
       const metadata = await this.audioExtractionService.fetchMetadata(url)
 
@@ -33,14 +43,18 @@ export class AudioController {
         .catch(() => false)
 
       if (!alreadyProcessed) {
-        try {
-          this.audioExtractionService.processAudio(url, trackingId, metadata.duration)
-        } catch (error: Error | unknown) {
-          throw new ApiError(
-            'PROCESSING_FAILED',
-            error instanceof Error ? error.message : 'Processing failed'
-          )
-        }
+        activeJobs++
+        this.audioExtractionService
+          .processAudio(url, trackingId, metadata.duration)
+          .catch((error: Error | unknown) => {
+            console.error(
+              `Processing failed for ${trackingId}:`,
+              error instanceof Error ? error.message : error
+            )
+          })
+          .finally(() => {
+            activeJobs--
+          })
       }
 
       res.json({

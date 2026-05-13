@@ -57,6 +57,8 @@ export async function getVideoMetadata(url: string): Promise<VideoInfo> {
     let errorOutput = ''
 
     const child = spawn(ytDlpPath, [
+      '--cookies',
+      '/app/cookies.txt',
       '--print',
       'title',
       '--print',
@@ -129,6 +131,8 @@ export async function createAudioStream(url: string): Promise<{ stream: Readable
   const ytDlpPath = getYtDlpPath()
 
   const child = spawn(ytDlpPath, [
+    '--cookies',
+    '/app/cookies.txt',
     '--format',
     'bestaudio/best',
     '--no-playlist',
