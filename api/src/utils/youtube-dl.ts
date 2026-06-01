@@ -1,16 +1,16 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
+import { Readable } from 'stream'
 
 const require = createRequire(import.meta.url)
 
-import { Readable } from 'stream'
 import { spawn } from 'child_process'
+import { env } from '@/config/env'
 
 export interface VideoInfo {
   title: string
   duration: number
-  thumbnail: string
   width?: number
   height?: number
   ext?: string
@@ -22,6 +22,17 @@ export class YouTubeDLError extends Error {
     this.name = 'YouTubeDLError'
   }
 }
+
+export function isValidVideoUrl(url: string): boolean {
+  try {
+    const urlObj = new URL(url)
+    const supportedDomains = ['youtube.com', 'youtu.be', 'youtube-nocookie.com']
+    return supportedDomains.some((domain) => urlObj.hostname.includes(domain))
+  } catch {
+    return false
+  }
+}
+
 /**
  * Resolve yt-dlp binary path from youtube-dl-exec package
  */
@@ -38,136 +49,107 @@ export function getYtDlpPath(): string {
 
   return binaryPath
 }
-
-/**
- * Check if URL is a valid video platform
- */
-export function isValidVideoUrl(url: string): boolean {
-  try {
-    const urlObj = new URL(url)
-    const supportedDomains = ['youtube.com', 'youtu.be', 'vimeo.com', 'dailymotion.com']
-    return supportedDomains.some((domain) => urlObj.hostname.includes(domain))
-  } catch {
-    return false
-  }
-}
-
-/**
- * Fetch video metadata from URL using yt-dlp binary
- */
 export async function getVideoMetadata(url: string): Promise<VideoInfo> {
-  try {
-    const ytDlpPath = getYtDlpPath()
+  const ytDlpPath = getYtDlpPath()
 
-    return new Promise((resolve, reject) => {
-      let jsonOutput = ''
-      let errorOutput = ''
+  return new Promise((resolve, reject) => {
+    let output = ''
+    let errorOutput = ''
 
-      const process = spawn(ytDlpPath, [
-        '--js-runtimes',
-        'node',
-        '--dump-json',
-        '--no-warnings',
-        '-q',
-        url,
-      ])
-
-      process.stdout?.on('data', (data: Buffer) => {
-        jsonOutput += data.toString()
-      })
-
-      process.stderr?.on('data', (data: Buffer) => {
-        errorOutput += data.toString()
-      })
-
-      process.on('close', (code: number) => {
-        if (code === 0) {
-          try {
-            const info = JSON.parse(jsonOutput)
-            const result: VideoInfo = {
-              title: info.title || 'Unknown Title',
-              duration: info.duration || 0,
-              thumbnail: info.thumbnail || '',
-              width: info.width,
-              height: info.height,
-              ext: 'm4a',
-            }
-            resolve(result)
-          } catch (e) {
-            reject(new YouTubeDLError(`Failed to parse yt-dlp output: ${e}`))
-          }
-        } else {
-          reject(
-            new YouTubeDLError(`yt-dlp failed with code ${code}: ${errorOutput || 'Unknown error'}`)
-          )
-        }
-      })
-
-      process.on('error', (error: Error) => {
-        reject(error)
-      })
-    })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    console.log('Failed to fetch metadata', { error: message, url })
-    throw new YouTubeDLError(`Could not fetch video metadata: ${message}`)
-  }
-}
-
-/**
- * Create audio stream from video URL using yt-dlp binary
- * Returns a readable stream of audio data
- * @param url - Video URL
- * @param onProgress - Optional callback for progress updates
- * @returns Stream object
- */
-export async function createAudioStream(
-  url: string,
-  onProgress?: (message: string) => void
-): Promise<{ stream: Readable }> {
-  try {
-    const ytDlpPath = getYtDlpPath()
-
-    if (onProgress) {
-      onProgress('Starting download...')
-    }
-
-    // Use yt-dlp to extract audio stream to stdout
-    const process = spawn(ytDlpPath, [
-      '--js-runtimes',
-      'node',
-      '--format',
-      'bestaudio/best',
-      '--extract-audio',
-      '--audio-format',
-      'm4a',
-      '--audio-quality',
-      '128K',
-      '-o',
-      '-', // Output to stdout
+    const child = spawn(ytDlpPath, [
+      '--cookies',
+      '/app/cookies.txt',
+      '--print',
+      'title',
+      '--print',
+      'duration',
+      '--print',
+      'width',
+      '--print',
+      'height',
+      '--print',
+      'ext',
+      '--no-playlist',
       '--no-warnings',
       '-q',
       url,
     ])
 
-    if (!process.stdout) {
-      throw new YouTubeDLError('Failed to create audio stream - no stdout')
-    }
+    const timeout = setTimeout(() => {
+      child.kill()
+      reject(new YouTubeDLError('yt-dlp timed out after 30s'))
+    }, 30_000)
 
-    if (onProgress) {
-      onProgress('Downloading audio...')
-    }
+    const maxBytes = env.audio.maxFileSize * 1024 * 1024
+    let totalBytes = 0
 
-    // Handle process errors
-    process.on('error', (error: Error) => {
-      console.log('yt-dlp process error', error.message)
-      process.stdout?.destroy(error)
+    child.stdout.on('data', (chunk: Buffer) => {
+      totalBytes += chunk.length
+      if (totalBytes > maxBytes) {
+        child.kill()
+        child.stdout?.destroy(
+          new YouTubeDLError(`File too large: exceeded ${env.audio.maxFileSize}MB`)
+        )
+      }
     })
 
-    return { stream: process.stdout }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    console.log('Failed to create audio stream', { error: message, url })
-    throw new YouTubeDLError(`Failed to create audio stream: ${message}`)
+    child.stdout.on('data', (data: Buffer) => {
+      output += data.toString()
+    })
+
+    child.stderr.on('data', (data: Buffer) => {
+      errorOutput += data.toString()
+    })
+
+    child.on('close', (code: number) => {
+      clearTimeout(timeout)
+
+      if (code !== 0) {
+        return reject(
+          new YouTubeDLError(`yt-dlp failed with code ${code}: ${errorOutput || 'Unknown error'}`)
+        )
+      }
+
+      const [title, duration, width, height, ext] = output.trim().split('\n')
+
+      resolve({
+        title: title || 'Unknown Title',
+        duration: parseFloat(duration) || 0,
+        width: width ? parseInt(width) : undefined,
+        height: height ? parseInt(height) : undefined,
+        ext: ext || 'm4a',
+      })
+    })
+
+    child.on('error', (error: Error) => {
+      clearTimeout(timeout)
+      reject(error)
+    })
+  })
+}
+export async function createAudioStream(url: string): Promise<{ stream: Readable }> {
+  const ytDlpPath = getYtDlpPath()
+
+  const child = spawn(ytDlpPath, [
+    '--cookies',
+    '/app/cookies.txt',
+    '--format',
+    'bestaudio/best',
+    '--no-playlist',
+    '--no-warnings',
+    '-q',
+    '-o',
+    '-',
+    url,
+  ])
+
+  if (!child.stdout) {
+    throw new YouTubeDLError('Failed to create audio stream - no stdout')
   }
+
+  child.on('error', (error: Error) => {
+    child.stdout?.destroy(error)
+  })
+
+  return { stream: child.stdout }
 }

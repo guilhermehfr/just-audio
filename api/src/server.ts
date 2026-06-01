@@ -1,7 +1,12 @@
-import app from './app'
-import config from './config'
+import 'dotenv/config'
 
-const port = config.port
+import app from './app'
+import { env } from './config/env'
+import { ensureBucket } from './lib/s3'
+
+const port = env.server.port
+
+await ensureBucket()
 
 const server = app.listen(port, () => {
   console.log(`Server running on port ${port}`)

@@ -1,5 +1,7 @@
 import express, { Express } from 'express'
 
+// TODO: Restrict CORS_ORIGIN to specific trusted domains before deploying to production.
+
 import { corsMiddleware } from './middleware/cors'
 import { errorHandler, notFoundHandler } from './middleware/errorHandler'
 import apiRoutes from './routes'
