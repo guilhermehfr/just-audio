@@ -65,7 +65,7 @@ pnpm install
 ### 3. Configurar Variáveis de Ambiente
 
 ```bash
-# Copiar arquivo de exemplo
+# Copiar arquivo de exemplo para desenvolvimento local
 cp .env.example .env
 
 # Editar arquivo .env com suas configurações
@@ -73,7 +73,16 @@ cp .env.example .env
 nano .env
 ```
 
-### 4. Iniciar Infraestrutura (Docker)
+### 4. Configurar Ambiente Docker
+
+```bash
+# Copiar template pré-configurado para o Docker Compose
+cp .env.docker.example .env.docker
+```
+
+Os valores já estão pré-configurados para o `docker-compose.yml`. Edite `api/.env.docker` apenas se alterar as credenciais do MinIO em `docker-compose.yml`.
+
+### 5. Iniciar Infraestrutura (Docker)
 
 ```bash
 # Inicia MinIO e outros serviços
@@ -488,9 +497,23 @@ pnpm run infra:down:clean
 
 | Serviço | Porta | URL | Credenciais |
 |---------|-------|-----|-------------|
-| MinIO (S3) | 9000 | http://localhost:9000 | minioadmin/minioadmin |
-| MinIO Console | 9001 | http://localhost:9001 | minioadmin/minioadmin |
+| MinIO (S3) | 9000 | http://localhost:9000 | admin/password123 |
+| MinIO Console | 9001 | http://localhost:9001 | admin/password123 |
 | API | 3000 | http://localhost:3000 | - |
+
+### Cookies para YouTube
+
+`cookies.txt` é **opcional**. Só necessário sob taxas de extração intensas (load tests, 10+ req/min).
+
+- **Light usage** (~2 req/h): yt-dlp funciona sem cookies.
+- **Load tests**: exporte cookies do navegador no formato Netscape para `api/cookies.txt`.
+
+```bash
+# Montar o arquivo no container (sem rebuild)
+docker run -v $(pwd)/cookies.txt:/app/cookies.txt ...
+```
+
+Consulte `cookies.txt.sample` para instruções de exportação.
 
 ### Dockerfile para Produção
 
@@ -500,9 +523,9 @@ docker build -t just-audio-api:latest .
 
 # Executar container
 docker run -p 3000:3000 \
-  -e MINIO_ENDPOINT=minio:9000 \
-  -e MINIO_ACCESS_KEY=minioadmin \
-  -e MINIO_SECRET_KEY=minioadmin \
+  -e MINIO_ENDPOINT=http://minio:9000 \
+  -e MINIO_ACCESS_KEY=admin \
+  -e MINIO_SECRET_KEY=password123 \
   -e MINIO_BUCKET=audio \
   -e AUDIO_TEMP_DIR=/tmp/audio \
   just-audio-api:latest

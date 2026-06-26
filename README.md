@@ -126,7 +126,7 @@ PORT=3000
 NODE_ENV=development
 RATE_LIMIT_MAX=10
 
-MINIO_ENDPOINT=localhost:9000
+MINIO_ENDPOINT=http://localhost:9000
 MINIO_ACCESS_KEY=minioadmin
 MINIO_SECRET_KEY=minioadmin
 MINIO_BUCKET=audio
@@ -141,7 +141,17 @@ MAX_CONCURRENT_JOBS=3
 CORS_ORIGIN=*
 ```
 
+> **Cookies**: `cookies.txt` is optional — only needed for heavy load testing. See `api/cookies.txt.sample` and `api/README.md` for details.
+
 ### Infrastructure
+
+Before starting, create the Docker environment file from the template:
+
+```sh
+cp api/.env.docker.example api/.env.docker
+```
+
+Values are pre-configured for `docker-compose.yml`. Edit `api/.env.docker` only if you changed MinIO credentials in `docker-compose.yml`.
 
 ```sh
 pnpm run infra:up
