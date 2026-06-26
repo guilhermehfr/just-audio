@@ -56,24 +56,23 @@ export async function getVideoMetadata(url: string): Promise<VideoInfo> {
     let output = ''
     let errorOutput = ''
 
-    const child = spawn(ytDlpPath, [
-      '--cookies',
-      '/app/cookies.txt',
-      '--print',
-      'title',
-      '--print',
-      'duration',
-      '--print',
-      'width',
-      '--print',
-      'height',
-      '--print',
-      'ext',
+    const args: string[] = []
+    if (fs.existsSync('/app/cookies.txt')) {
+      args.push('--cookies', '/app/cookies.txt')
+    }
+    args.push(
+      '--print', 'title',
+      '--print', 'duration',
+      '--print', 'width',
+      '--print', 'height',
+      '--print', 'ext',
       '--no-playlist',
       '--no-warnings',
       '-q',
       url,
-    ])
+    )
+
+    const child = spawn(ytDlpPath, args)
 
     const timeout = setTimeout(() => {
       child.kill()
@@ -131,8 +130,7 @@ export async function createAudioStream(url: string): Promise<{ stream: Readable
   const ytDlpPath = getYtDlpPath()
 
   const child = spawn(ytDlpPath, [
-    '--cookies',
-    '/app/cookies.txt',
+    ...(fs.existsSync('/app/cookies.txt') ? ['--cookies', '/app/cookies.txt'] : []),
     '--format',
     'bestaudio/best',
     '--no-playlist',

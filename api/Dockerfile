@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
@@ -18,8 +18,6 @@ RUN mkdir -p /app/node_modules/.pnpm/youtube-dl-exec@3.1.5/node_modules/youtube-
   && chmod +x /app/node_modules/.pnpm/youtube-dl-exec@3.1.5/node_modules/youtube-dl-exec/bin/yt-dlp
 
 COPY . .
-
-COPY api/cookies.txt /app/cookies.txt
 
 RUN pnpm --filter api build
 

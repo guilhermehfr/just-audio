@@ -1,0 +1,17 @@
+# ------------------------------------------------------------------
+# cookies.txt — OPTIONAL, only needed for heavy load testing
+# ------------------------------------------------------------------
+# For light usage (~2 req/h), yt-dlp works fine without cookies.
+#
+# If running load tests, export cookies from your browser in
+# Netscape format and save to api/cookies.txt, then either:
+#   - Rebuild the Docker image, or
+#   - Mount the file at runtime:
+#       docker run -v $(pwd)/api/cookies.txt:/app/cookies.txt ...
+#
+# How to export:
+#   - Browser extension: "Get cookies.txt" (Netscape format)
+#   - yt-dlp: yt-dlp --cookies-from-browser chrome
+#                --cookies cookies.txt
+#
+# ------------------------------------------------------------------
