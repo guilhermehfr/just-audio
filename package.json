@@ -1,10 +1,20 @@
 {
-  "name": "just-audio",
+  "name": "just-audio-monorepo",
   "version": "1.0.0",
   "description": "",
   "private": true,
-  "workspaces": [
-    "api",
-    "web"
-  ]
+  "devDependencies": {
+    "concurrently": "^10.0.3"
+  },
+  "scripts": {
+    "dev": "concurrently -n api,web -c cyan,magenta \"pnpm --filter api run dev\" \"pnpm --filter web run dev\"",
+    "dev:infra": "pnpm --filter api run infra:up && pnpm run dev",
+    "start": "pnpm --filter api run start",
+    "build:api": "pnpm --filter api run build",
+    "build:web": "pnpm --filter web run build",
+    "build": "pnpm run build:api && pnpm run build:web",
+    "check:api": "pnpm --filter api run check",
+    "check:web": "pnpm --filter web run lint",
+    "check": "pnpm run check:api && pnpm run check:web"
+  }
 }
