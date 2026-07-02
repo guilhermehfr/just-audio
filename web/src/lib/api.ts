@@ -16,13 +16,21 @@ interface AudioExtractionResult {
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
 
-export async function postAudio(url: string): Promise<ApiResponse<AudioExtractionResult>> {
+export async function postAudio(url: string): Promise<AudioExtractionResult> {
   const res = await fetch(`${BASE_URL}/api/audio`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ url }),
   })
-  return res.json()
+
+  const body: ApiResponse<AudioExtractionResult> = await res.json()
+
+  if (!body.success || !body.data) {
+    const err = body.error
+    throw new Error(err ? `[${err.code}] ${err.message}` : 'Unknown API error')
+  }
+
+  return body.data
 }
 
 export async function getAudioFile(trackingId: string, file: string): Promise<Response> {
