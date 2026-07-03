@@ -24,6 +24,11 @@ for i in $(seq 1 30); do
   sleep 1
 done
 
+if [ -n "$COOKIES" ]; then
+  echo "$COOKIES" | base64 -d > /app/cookies.txt
+  echo "Cookies written to /app/cookies.txt"
+fi
+
 echo "Starting API server..."
 node /app/api/dist/server.js &
 NODE_PID=$!
