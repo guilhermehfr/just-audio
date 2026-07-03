@@ -10,6 +10,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'Just Audio',
   description: 'Your lightest audio experience',
+  icons: [{ rel: 'icon', url: '/favicon.svg', type: 'image/svg+xml' }],
 }
 
 export default function RootLayout({
