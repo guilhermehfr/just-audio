@@ -25,7 +25,7 @@ for i in $(seq 1 30); do
 done
 
 if [ -n "$COOKIES" ]; then
-  echo "$COOKIES" | base64 -d > /app/cookies.txt
+  printf '%s\n' "$COOKIES" | base64 -d > /app/cookies.txt
   echo "Cookies written to /app/cookies.txt"
 fi
 

@@ -17,6 +17,7 @@ class App {
   }
 
   private initializeMiddleware(): void {
+    this.app.set('trust proxy', 1)
     this.app.use(express.json())
     this.app.use(express.urlencoded({ extended: true }))
 
