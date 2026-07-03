@@ -14,7 +14,7 @@ interface AudioExtractionResult {
   duration: number
 }
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
+export const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
 
 export async function postAudio(url: string): Promise<AudioExtractionResult> {
   const res = await fetch(`${BASE_URL}/api/audio`, {
@@ -35,6 +35,12 @@ export async function postAudio(url: string): Promise<AudioExtractionResult> {
 
 export async function getAudioFile(trackingId: string, file: string): Promise<Response> {
   return fetch(`${BASE_URL}/api/audio/${trackingId}/${file}`)
+}
+
+export async function getAudioStatus(trackingId: string): Promise<boolean> {
+  const res = await fetch(`${BASE_URL}/api/audio/${trackingId}/status`)
+  const body: ApiResponse<{ ready: boolean }> = await res.json()
+  return body.success && body.data?.ready === true
 }
 
 export async function pollPlaylist(
