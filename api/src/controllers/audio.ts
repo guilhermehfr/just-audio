@@ -3,7 +3,7 @@ import path from 'node:path'
 import fs from 'node:fs/promises'
 import { ApiError } from '../middleware/errorHandler'
 import { AudioExtractionService } from '../services/AudioExtraction'
-import { downloadFile } from '../services/AudioStorage'
+import { downloadFile, fileExists } from '../services/AudioStorage'
 import { isValidVideoUrl } from '@/utils/youtube-dl'
 import { env } from '../config/env'
 
@@ -14,6 +14,10 @@ interface PostAudioBody {
 interface GetAudioParams {
   trackingId: string
   file: string
+}
+
+interface GetStatusParams {
+  trackingId: string
 }
 
 let activeJobs = 0
@@ -71,6 +75,14 @@ export class AudioController {
       console.error('Unexpected error in postAudio', error)
       throw new ApiError('INTERNAL_ERROR', 'Failed to process audio')
     }
+  }
+
+  async getStatus(req: Request<GetStatusParams>, res: Response): Promise<void> {
+    const { trackingId } = req.params
+    if (!trackingId) throw new ApiError('MISSING_PARAMETERS', 'Missing tracking ID')
+
+    const exists = await fileExists(`${trackingId}/playlist.m3u8`)
+    res.json({ success: true, data: { ready: exists }, timestamp: new Date().toISOString() })
   }
 
   async getAudio(req: Request<GetAudioParams>, res: Response): Promise<void> {

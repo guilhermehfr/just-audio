@@ -202,6 +202,33 @@ curl http://localhost:3000/api/audio/audio-dQw4w9WgXcQ/playlist.m3u8
 
 ---
 
+### GET /api/audio/:trackingId/status
+
+Verifica se o HLS playlist está pronto. Sempre retorna HTTP 200 com JSON — sem 404s no console do navegador.
+
+| Parâmetro | Tipo | Descrição |
+|-----------|------|-----------|
+| `trackingId` | string | ID retornado pelo POST |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "ready": true
+  },
+  "timestamp": "2026-07-02T12:00:00.000Z"
+}
+```
+
+| `ready` | Significado |
+|---------|-------------|
+| `false` | FFmpeg ainda processando |
+| `true`  | Playlist disponível para streaming |
+
+---
+
 ### GET /api/health
 
 Health check simples para liveness probes (Kubernetes).
@@ -342,9 +369,9 @@ Todas respostas seguem o mesmo envelope:
 ### Fire and Forget + Short-Polling
 
 1. **POST** retorna antes do processamento terminar
-2. Cliente faz **polling no GET** até 200
-3. **404** = FFmpeg ainda não escreveu o primeiro segmento
-4. **200** = primeiro segmento disponível
+2. Cliente faz **polling em `/api/audio/:trackingId/status`** (JSON, sempre HTTP 200 — sem 404s no console)
+3. `ready: false` = FFmpeg ainda processando
+4. `ready: true` = playlist disponível para streaming via hls.js
 
 ---
 

@@ -1,6 +1,15 @@
-import { GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3'
+import { GetObjectCommand, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3'
 import { s3 } from '../lib/s3'
 import { env } from '../config/env'
+
+export async function fileExists(key: string): Promise<boolean> {
+  try {
+    await s3.send(new HeadObjectCommand({ Bucket: env.minio.bucket, Key: key }))
+    return true
+  } catch {
+    return false
+  }
+}
 
 export async function downloadFile(key: string): Promise<Buffer> {
   const command = new GetObjectCommand({

@@ -26,6 +26,7 @@ router.post('/', audioRateLimiter, (req, res, next) =>
   audioController.postAudio(req, res).catch(next)
 )
 
+router.get('/:trackingId/status', (req, res, next) => audioController.getStatus(req, res).catch(next))
 router.get('/:trackingId/:file', (req, res, next) => audioController.getAudio(req, res).catch(next))
 
 export default router
