@@ -132,7 +132,7 @@ export async function createAudioStream(url: string): Promise<{ stream: Readable
   const child = spawn(ytDlpPath, [
     ...(fs.existsSync('/app/cookies.txt') ? ['--cookies', '/app/cookies.txt'] : []),
     '--format',
-    'bestaudio/best',
+    'bestaudio[ext=m4a]/bestaudio/best',
     '--no-playlist',
     '--no-warnings',
     '-q',
