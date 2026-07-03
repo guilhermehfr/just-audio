@@ -25,8 +25,14 @@ for i in $(seq 1 30); do
 done
 
 if [ -n "$COOKIES" ]; then
-  printf '%s\n' "$COOKIES" | base64 -d > /app/cookies.txt
-  echo "Cookies written to /app/cookies.txt"
+  echo "COOKIES detected (length: ${#COOKIES})"
+  if printf '%s\n' "$COOKIES" | base64 -d > /app/cookies.txt 2>&1; then
+    echo "Cookies written ($(wc -l < /app/cookies.txt) lines)"
+  else
+    echo "COOKIES DECODE FAILED"
+  fi
+else
+  echo "WARNING: COOKIES env var is empty"
 fi
 
 echo "Starting API server..."
