@@ -4,16 +4,9 @@ import { spawn } from 'child_process'
 import { Readable } from 'stream'
 import { uploadFile } from '../services/AudioStorage'
 
-export async function segmentAudioToHLS(
-  audioStream: Readable,
-  trackingId: string,
-  outputDir: string,
-  durationSeconds: number
-): Promise<void> {
-  return segmentAudioToHLSInternal(audioStream, trackingId, outputDir, durationSeconds)
-}
+const SEGMENT_RE = /^segment_\d{3}\.ts$/
 
-export async function segmentAudioToHLSInternal(
+export async function segmentAudioToHLS(
   audioStream: Readable,
   trackingId: string,
   outputDir: string,
@@ -21,60 +14,106 @@ export async function segmentAudioToHLSInternal(
 ): Promise<void> {
   await fs.mkdir(outputDir, { recursive: true })
 
-  return new Promise((resolve, reject) => {
-    const segmentsDuration = getSegmentsDuration(durationSeconds).toString()
+  const segmentsDuration = getSegmentsDuration(durationSeconds).toString()
 
-    const ffmpeg = spawn('ffmpeg', [
-      '-i',
-      'pipe:0',
-      '-c:a',
-      'aac',
-      '-b:a',
-      '128k',
-      '-hls_time',
-      segmentsDuration,
-      '-hls_list_size',
-      '0',
-      '-hls_segment_filename',
-      `${outputDir}/segment_%03d.ts`,
-      `${outputDir}/playlist.m3u8`,
-    ])
+  const ffmpeg = spawn('ffmpeg', [
+    '-i', 'pipe:0',
+    '-c:a', 'aac',
+    '-b:a', '128k',
+    '-hls_time', segmentsDuration,
+    '-hls_list_size', '0',
+    '-hls_playlist_type', 'event',
+    '-hls_segment_filename', `${outputDir}/segment_%03d.ts`,
+    `${outputDir}/playlist.m3u8`,
+  ])
 
-    audioStream.pipe(ffmpeg.stdin)
+  audioStream.pipe(ffmpeg.stdin)
 
-    ffmpeg.stdin.on('error', reject)
+  // Ignore stdin EPIPE — happens naturally on ffmpeg close
+  ffmpeg.stdin.on('error', () => {})
+
+  return new Promise<void>((resolve, reject) => {
+    let resolved = false
+    const uploaded = new Set<string>()
+    let interval: ReturnType<typeof setInterval>
+
+    const uploadNewFiles = async () => {
+      let files: string[]
+      try {
+        files = await fs.readdir(outputDir)
+      } catch {
+        return
+      }
+
+      for (const filename of files) {
+        if (uploaded.has(filename)) continue
+        if (filename !== 'playlist.m3u8' && !SEGMENT_RE.test(filename)) continue
+
+        const filepath = path.join(outputDir, filename)
+
+        let stat: Awaited<ReturnType<typeof fs.stat>>
+        try {
+          stat = await fs.stat(filepath)
+        } catch {
+          continue
+        }
+
+        if (stat.size === 0) continue
+
+        try {
+          const data = await fs.readFile(filepath)
+          const contentType = filename.endsWith('.m3u8')
+            ? 'application/vnd.apple.mpegurl'
+            : 'video/mp2t'
+          await uploadFile(`${trackingId}/${filename}`, data, contentType)
+          uploaded.add(filename)
+
+          if (!resolved && uploaded.has('playlist.m3u8')) {
+            const hasSegment = [...uploaded].some((f) => SEGMENT_RE.test(f))
+            if (hasSegment) {
+              resolved = true
+              resolve()
+            }
+          }
+        } catch (err) {
+          console.error(`Upload failed for ${filename}:`, err)
+        }
+      }
+    }
+
+    interval = setInterval(uploadNewFiles, 500)
 
     ffmpeg.on('close', async (code) => {
-      if (code !== 0) return reject(new Error(`ffmpeg exited with code ${code}`))
+      clearInterval(interval)
+      await uploadNewFiles()
 
-      try {
-        const files = await fs.readdir(outputDir)
-
-        await Promise.all(
-          files.map(async (filename) => {
-            console.log(`Uploading ${filename} to S3...`)
-            const data = await fs.readFile(path.join(outputDir, filename))
-            const contentType = filename.endsWith('.m3u8')
-              ? 'application/vnd.apple.mpegurl'
-              : 'video/mp2t'
-            await uploadFile(`${trackingId}/${filename}`, data, contentType)
-          })
-        )
-
-        await fs.rm(outputDir, { recursive: true, force: true })
-        resolve()
-      } catch (error) {
-        reject(error)
+      if (code !== 0 && !resolved) {
+        await fs.rm(outputDir, { recursive: true, force: true }).catch(() => {})
+        reject(new Error(`ffmpeg exited with code ${code}`))
+        return
       }
+
+      if (!resolved) {
+        await fs.rm(outputDir, { recursive: true, force: true }).catch(() => {})
+        reject(new Error('ffmpeg finished but no HLS output found'))
+        return
+      }
+
+      await fs.rm(outputDir, { recursive: true, force: true }).catch(() => {})
     })
 
-    ffmpeg.on('error', reject)
+    ffmpeg.on('error', (err) => {
+      if (!resolved) {
+        clearInterval(interval)
+        reject(err)
+      }
+    })
   })
 }
 
 export function getSegmentsDuration(durationSeconds: number): number {
-  if (durationSeconds <= 600) return 10 // até 10min → ~60 segmentos
-  if (durationSeconds <= 3600) return 30 // até 1h    → ~120 segmentos
-  if (durationSeconds <= 7200) return 60 // até 2h    → ~120 segmentos
-  return 120 // até 4h    → ~120 segmentos
+  if (durationSeconds <= 600) return 10
+  if (durationSeconds <= 3600) return 30
+  if (durationSeconds <= 7200) return 60
+  return 120
 }
