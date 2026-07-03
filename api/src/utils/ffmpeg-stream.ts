@@ -35,6 +35,7 @@ export async function segmentAudioToHLS(
   return new Promise<void>((resolve, reject) => {
     let resolved = false
     const uploaded = new Set<string>()
+    let playlistMtime = 0
     let interval: ReturnType<typeof setInterval>
 
     const uploadNewFiles = async () => {
@@ -46,7 +47,6 @@ export async function segmentAudioToHLS(
       }
 
       for (const filename of files) {
-        if (uploaded.has(filename)) continue
         if (filename !== 'playlist.m3u8' && !SEGMENT_RE.test(filename)) continue
 
         const filepath = path.join(outputDir, filename)
@@ -59,6 +59,13 @@ export async function segmentAudioToHLS(
         }
 
         if (stat.size === 0) continue
+
+        if (filename === 'playlist.m3u8') {
+          if (stat.mtimeMs <= playlistMtime) continue
+          playlistMtime = stat.mtimeMs
+        } else if (uploaded.has(filename)) {
+          continue
+        }
 
         try {
           const data = await fs.readFile(filepath)
