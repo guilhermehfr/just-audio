@@ -28,7 +28,7 @@ export function useAudioPlayer(
   const hlsRef = useRef<Hls | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
-  const [duration, setDuration] = useState(initialDuration)
+  const duration = initialDuration
   const [speed, setSpeedState] = useState(1)
   const [loop, setLoop] = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)
@@ -51,9 +51,6 @@ export function useAudioPlayer(
     const onPause = () => setIsPlaying(false)
     const onEnded = () => setIsPlaying(false)
     const onLoadedMeta = () => {
-      if (audio.duration && isFinite(audio.duration)) {
-        setDuration(audio.duration)
-      }
       setHasLoaded(true)
     }
     const onCanPlay = () => setHasLoaded(true)
