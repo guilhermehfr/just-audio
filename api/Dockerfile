@@ -14,7 +14,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 COPY api/package.json ./api/
 
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --ignore-scripts && pnpm rebuild esbuild
 
 # Replace bundled yt-dlp with latest (version-agnostic) for better anti-bot handling
 RUN YT_DLP_PATH=$(find /app -path "*/youtube-dl-exec/bin/yt-dlp" -type f | head -1) \
