@@ -134,7 +134,7 @@ export async function createAudioStream(url: string): Promise<{ stream: Readable
     ...(fs.existsSync('/app/cookies.txt') ? ['--cookies', '/app/cookies.txt'] : []),
     '--extractor-args', 'youtube:player_client=android,web',
     '--format',
-    'bestaudio[ext=m4a]/bestaudio/best',
+    'bestaudio/best',
     '--no-playlist',
     '--no-warnings',
     '-q',
