@@ -17,10 +17,10 @@ COPY api/package.json ./api/
 RUN pnpm install --frozen-lockfile --ignore-scripts && pnpm rebuild esbuild
 
 # Replace bundled yt-dlp with latest (version-agnostic) for better anti-bot handling
-RUN YT_DLP_PATH=$(find /app -path "*/youtube-dl-exec/bin/yt-dlp" -type f | head -1) \
-  && rm -f "$YT_DLP_PATH" \
-  && curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o "$YT_DLP_PATH" \
-  && chmod +x "$YT_DLP_PATH"
+RUN YT_DLP_DIR=$(find /app/node_modules/.pnpm -path "*/node_modules/youtube-dl-exec" -type d | head -1) \
+  && mkdir -p "$YT_DLP_DIR/bin" \
+  && curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o "$YT_DLP_DIR/bin/yt-dlp" \
+  && chmod +x "$YT_DLP_DIR/bin/yt-dlp"
 
 COPY . .
 
