@@ -2,18 +2,22 @@
 
 # 🎧 Just Audio
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Vercel Status](https://therealsujitk-vercel-badge.vercel.app/?app=webhook-handler-generator)](https://just-audio.vercel.app/)
+[![Render](https://img.shields.io/badge/render-live-brightgreen?style=flat&logo=render&logoColor=white)](https://just-audio.onrender.com/api/health)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-YouTube audio extraction and HLS streaming - backend API + Next.js frontend. Extracts audio from YouTube videos via yt-dlp, transcodes to HLS with FFmpeg, stores segments in S3-compatible storage (MinIO), and serves them through a polling-based streaming workflow with waveform visualization and transport controls.
+A YouTube audio extraction and HLS streaming application - backend API + Next.js frontend. Extracts audio from YouTube videos via yt-dlp, transcodes to HLS with FFmpeg, stores segments in S3-compatible storage (MinIO), and serves them through a polling-based streaming workflow with waveform visualization and transport controls.
 
 **Backend:** TypeScript · Node.js · Express · FFmpeg · yt-dlp · MinIO/S3  
 **Frontend:** Next.js · Tailwind CSS v4 · hls.js · lucide-react
 
-🌐 *[Leia em Português](api/README.md)*
+🌐 _[Leia em Português](README.md)_
+
+<img width="700" height="400" alt="image" src="https://github.com/user-attachments/assets/ebc2ab2a-9771-462b-9a76-049f350e2a89" />
 
 </br>
 
-[Report Bug](https://github.com/guilhermehfr/just-audio/issues) · [Request Feature](https://github.com/guilhermehfr/just-audio/issues)
+[Live Demo](https://just-audio.vercel.app/) · [API](https://just-audio.onrender.com/api/health) · [Report Bug](https://github.com/guilhermehfr/just-audio/issues)
 
 </div>
 
