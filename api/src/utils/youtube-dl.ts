@@ -61,12 +61,8 @@ export async function getVideoMetadata(url: string): Promise<VideoInfo> {
       args.push('--cookies', '/app/cookies.txt')
     }
     args.push(
-      '--extractor-args', 'youtube:player_client=android,web',
       '--print', 'title',
       '--print', 'duration',
-      '--print', 'width',
-      '--print', 'height',
-      '--print', 'ext',
       '--no-playlist',
       '--no-warnings',
       '-q',
@@ -110,14 +106,11 @@ export async function getVideoMetadata(url: string): Promise<VideoInfo> {
         )
       }
 
-      const [title, duration, width, height, ext] = output.trim().split('\n')
+      const [title, duration] = output.trim().split('\n')
 
       resolve({
         title: title || 'Unknown Title',
         duration: parseFloat(duration) || 0,
-        width: width ? parseInt(width) : undefined,
-        height: height ? parseInt(height) : undefined,
-        ext: ext || 'm4a',
       })
     })
 
@@ -132,7 +125,6 @@ export async function createAudioStream(url: string): Promise<{ stream: Readable
 
   const child = spawn(ytDlpPath, [
     ...(fs.existsSync('/app/cookies.txt') ? ['--cookies', '/app/cookies.txt'] : []),
-    '--extractor-args', 'youtube:player_client=android,web',
     '--format',
     'bestaudio/best',
     '--no-playlist',

@@ -4,7 +4,7 @@ WORKDIR /app
 
 RUN corepack enable
 
-RUN apk add --no-cache ffmpeg python3 curl
+RUN apk add --no-cache ffmpeg python3 curl deno
 
 # Install MinIO
 RUN curl -L https://dl.min.io/server/minio/release/linux-amd64/minio -o /usr/local/bin/minio \
