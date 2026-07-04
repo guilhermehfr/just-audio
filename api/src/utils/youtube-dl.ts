@@ -74,7 +74,7 @@ export async function getVideoMetadata(url: string): Promise<VideoInfo> {
     const timeout = setTimeout(() => {
       child.kill()
       reject(new YouTubeDLError('yt-dlp timed out after 30s'))
-    }, 30_000)
+    }, 120_000)
 
     const maxBytes = env.audio.maxFileSize * 1024 * 1024
     let totalBytes = 0
