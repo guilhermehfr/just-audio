@@ -4,7 +4,7 @@ import fs from 'node:fs/promises'
 import { ApiError } from '../middleware/errorHandler'
 import { AudioExtractionService } from '../services/AudioExtraction'
 import { downloadFile, fileExists } from '../services/AudioStorage'
-import { isValidVideoUrl } from '@/utils/youtube-dl'
+import { isValidYoutubeUrl, extractVideoId } from '@just-audio/shared'
 import { env } from '../config/env'
 
 interface PostAudioBody {
@@ -121,16 +121,15 @@ export class AudioController {
   }
 
   private generateTrackingId(url: string): string {
-    if (!isValidVideoUrl(url)) throw new ApiError('INVALID_URL', 'Invalid YouTube URL')
+    if (!isValidYoutubeUrl(url)) {
+      throw new ApiError('INVALID_URL', 'Invalid YouTube URL')
+    }
 
-    const domainsRegex =
-      '(?:youtube\\.com\\/(?:watch\\?(?:.*&)?v=|embed\\/|v\\/|vi\\/|shorts\\/|live\\/)|youtu\\.be\\/|youtube-nocookie\\.com\\/embed\\/)'
+    const videoId = extractVideoId(url)
+    if (!videoId) {
+      throw new ApiError('INVALID_URL', 'Could not extract video ID from URL')
+    }
 
-    const regex = new RegExp(`${domainsRegex}([a-zA-Z0-9_-]{11})`)
-    const match = url.match(regex)
-
-    if (!match) throw new ApiError('INVALID_URL', 'Could not extract video ID from URL')
-
-    return `audio-${match[1]}`
+    return `audio-${videoId}`
   }
 }

@@ -1,7 +1,37 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, useReducer } from 'react'
 import Hls from 'hls.js'
+
+interface PlayerState {
+  isPlaying: boolean
+  currentTime: number
+  hasLoaded: boolean
+}
+
+type PlayerAction =
+  | { type: 'RESET' }
+  | { type: 'TIME_UPDATE'; time: number }
+  | { type: 'PLAY' }
+  | { type: 'PAUSE' }
+  | { type: 'LOADED' }
+
+function playerReducer(state: PlayerState, action: PlayerAction): PlayerState {
+  switch (action.type) {
+    case 'RESET':
+      return { isPlaying: false, currentTime: 0, hasLoaded: false }
+    case 'TIME_UPDATE':
+      return { ...state, currentTime: action.time, hasLoaded: state.hasLoaded || action.time > 0 }
+    case 'PLAY':
+      return { ...state, isPlaying: true }
+    case 'PAUSE':
+      return { ...state, isPlaying: false }
+    case 'LOADED':
+      return { ...state, hasLoaded: true }
+  }
+}
+
+const INITIAL_STATE: PlayerState = { isPlaying: false, currentTime: 0, hasLoaded: false }
 
 export interface AudioPlayerAPI {
   audioRef: React.RefObject<HTMLAudioElement | null>
@@ -26,34 +56,25 @@ export function useAudioPlayer(
 ): AudioPlayerAPI {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const hlsRef = useRef<Hls | null>(null)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [currentTime, setCurrentTime] = useState(0)
+  const [state, dispatch] = useReducer(playerReducer, INITIAL_STATE)
   const duration = initialDuration
   const [speed, setSpeedState] = useState(1)
   const [loop, setLoop] = useState(false)
-  const [hasLoaded, setHasLoaded] = useState(false)
 
   useEffect(() => {
     const audio = audioRef.current
     if (!audio || !playlistUrl) return
 
     hlsRef.current?.destroy()
-    setHasLoaded(false)
-    setCurrentTime(0)
-    setIsPlaying(false)
+    dispatch({ type: 'RESET' })
     audio.currentTime = 0
 
-    const onTimeUpdate = () => {
-      setCurrentTime(audio.currentTime)
-      if (audio.currentTime > 0) setHasLoaded(true)
-    }
-    const onPlay = () => setIsPlaying(true)
-    const onPause = () => setIsPlaying(false)
-    const onEnded = () => setIsPlaying(false)
-    const onLoadedMeta = () => {
-      setHasLoaded(true)
-    }
-    const onCanPlay = () => setHasLoaded(true)
+    const onTimeUpdate = () => dispatch({ type: 'TIME_UPDATE', time: audio.currentTime })
+    const onPlay = () => dispatch({ type: 'PLAY' })
+    const onPause = () => dispatch({ type: 'PAUSE' })
+    const onEnded = () => dispatch({ type: 'PAUSE' })
+    const onLoadedMeta = () => dispatch({ type: 'LOADED' })
+    const onCanPlay = () => dispatch({ type: 'LOADED' })
 
     audio.addEventListener('timeupdate', onTimeUpdate)
     audio.addEventListener('play', onPlay)
@@ -106,8 +127,8 @@ export function useAudioPlayer(
     }
   }, [])
 
-  const canSkipBack = hasLoaded && currentTime >= 10
-  const canSkipForward = hasLoaded && currentTime + 10 <= duration
+  const canSkipBack = state.hasLoaded && state.currentTime >= 10
+  const canSkipForward = state.hasLoaded && state.currentTime + 10 <= duration
 
   const skipBack = useCallback(() => {
     const audio = audioRef.current
@@ -137,8 +158,8 @@ export function useAudioPlayer(
 
   return {
     audioRef,
-    isPlaying,
-    currentTime,
+    isPlaying: state.isPlaying,
+    currentTime: state.currentTime,
     duration,
     speed,
     loop,

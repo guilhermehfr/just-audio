@@ -1,6 +1,7 @@
 packages:
   - "api"
   - "web"
+  - "packages/*"
 allowBuilds:
   '@ffmpeg-installer/linux-x64': true
   esbuild: true

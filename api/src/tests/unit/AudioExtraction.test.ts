@@ -15,7 +15,6 @@ vi.mock('../../config/env', () => ({
 
 vi.mock('../../utils/youtube-dl', () => ({
   getVideoMetadata: vi.fn(),
-  isValidVideoUrl: vi.fn(),
   createAudioStream: vi.fn(),
   YouTubeDLError: class YouTubeDLError extends Error {
     constructor(message: string) {
@@ -57,42 +56,6 @@ describe('AudioExtractionService', () => {
     ffmpegStream = await import('../../utils/ffmpeg-stream')
     audioStorage = await import('../../services/AudioStorage')
     fs = await import('node:fs/promises')
-  })
-
-  describe('validateUrl', () => {
-    it('does not throw for valid YouTube URL', () => {
-      vi.mocked(youtubeDl.isValidVideoUrl).mockReturnValue(true)
-
-      expect(() => service.validateUrl('https://www.youtube.com/watch?v=57_O4pxPSxs')).not.toThrow()
-    })
-
-    it('throws ApiError with MISSING_URL code for empty URL', () => {
-      expect(() => service.validateUrl('')).toThrow(ApiError)
-    })
-
-    it('throws ApiError with INVALID_URL code for invalid URL', () => {
-      vi.mocked(youtubeDl.isValidVideoUrl).mockReturnValue(false)
-
-      expect(() => service.validateUrl('https://google.com')).toThrow(ApiError)
-    })
-
-    it('empty URL has MISSING_URL code', () => {
-      try {
-        service.validateUrl('')
-      } catch (error) {
-        expect((error as ApiError).code).toBe('MISSING_URL')
-      }
-    })
-
-    it('invalid URL has INVALID_URL code', () => {
-      vi.mocked(youtubeDl.isValidVideoUrl).mockReturnValue(false)
-
-      try {
-        service.validateUrl('https://google.com')
-      } catch (error) {
-        expect((error as ApiError).code).toBe('INVALID_URL')
-      }
-    })
   })
 
   describe('fetchMetadata', () => {

@@ -4,9 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Play, Pause, SkipBack, SkipForward, Repeat, Volume2, VolumeX } from 'lucide-react'
 
 interface PlayerControlsProps {
-  duration: number
   isPlaying: boolean
-  currentTime: number
   speed: number
   loop: boolean
   canSkipBack: boolean
@@ -20,9 +18,7 @@ interface PlayerControlsProps {
 }
 
 export function PlayerControls({
-  duration,
   isPlaying,
-  currentTime,
   speed,
   loop,
   canSkipBack,

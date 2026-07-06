@@ -23,16 +23,6 @@ export class YouTubeDLError extends Error {
   }
 }
 
-export function isValidVideoUrl(url: string): boolean {
-  try {
-    const urlObj = new URL(url)
-    const supportedDomains = ['youtube.com', 'youtu.be', 'youtube-nocookie.com']
-    return supportedDomains.some((domain) => urlObj.hostname.includes(domain))
-  } catch {
-    return false
-  }
-}
-
 /**
  * Resolve yt-dlp binary path from youtube-dl-exec package
  */

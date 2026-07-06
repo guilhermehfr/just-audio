@@ -2,7 +2,8 @@
 
 import { ClipboardPaste, Play } from 'lucide-react'
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { postAudio, getAudioStatus, BASE_URL } from '@/lib/api'
+import { getAudioStatus, BASE_URL } from '@/lib/api'
+import { extractAudio } from '@/lib/actions'
 import { useAudioPlayer } from '@/lib/use-audio-player'
 import { MetadataBar } from '@/components/metadata-bar'
 import { Waveform } from '@/components/waveform'
@@ -18,6 +19,7 @@ export function SearchBar(): React.ReactNode {
   const [trackingId, setTrackingId] = useState('')
   const [ready, setReady] = useState(false)
   const [waveKey, setWaveKey] = useState(0)
+  const [error, setError] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const [showLeftShadow, setShowLeftShadow] = useState(false)
   const [showRightShadow, setShowRightShadow] = useState(false)
@@ -26,7 +28,21 @@ export function SearchBar(): React.ReactNode {
     ? `${BASE_URL}/api/audio/${trackingId}/playlist.m3u8`
     : null
 
-  const audio = useAudioPlayer(playlistUrl, duration)
+  const {
+    audioRef,
+    isPlaying,
+    currentTime,
+    speed,
+    loop,
+    canSkipBack,
+    canSkipForward,
+    togglePlay,
+    skipBack,
+    skipForward,
+    setSpeed,
+    toggleLoop,
+    seekTo,
+  } = useAudioPlayer(playlistUrl, duration)
 
   const updateShadows = useCallback(() => {
     const el = inputRef.current
@@ -49,36 +65,41 @@ export function SearchBar(): React.ReactNode {
 
   async function handleSubmit() {
     if (!url.trim()) return
+    setError('')
     setLoading(true)
     setReady(false)
-    try {
-      const data = await postAudio(url.trim())
-      setSubmittedUrl(url.trim())
-      setTitle(data.title)
-      setDuration(data.duration)
-      setTrackingId(data.trackingId)
-      console.log(`Extraction started — trackingId: ${data.trackingId}`)
 
-      const maxAttempts = 30
-      const intervalMs = 2000
-      for (let i = 0; i < maxAttempts; i++) {
-        const ready = await getAudioStatus(data.trackingId)
-        if (ready) {
-          console.log(`Playlist ready! (attempt ${i + 1}/${maxAttempts})`)
-          setUrl('')
-          setWaveKey((k) => k + 1)
-          setReady(true)
-          return
-        }
-        console.log(`Poll attempt ${i + 1}/${maxAttempts}: not ready — retrying in ${intervalMs}ms`)
-        await new Promise((r) => setTimeout(r, intervalMs))
-      }
-      console.error('Poll failed after 30 attempts — timeout')
-    } catch (err) {
-      console.error('Extraction failed:', err)
-    } finally {
+    const result = await extractAudio(url.trim())
+
+    if (result.error) {
+      setError(result.error.message)
       setLoading(false)
+      return
     }
+
+    const data = result.data!
+    setSubmittedUrl(url.trim())
+    setTitle(data.title)
+    setDuration(data.duration)
+    setTrackingId(data.trackingId)
+    console.log(`Extraction started — trackingId: ${data.trackingId}`)
+
+    const maxAttempts = 30
+    const intervalMs = 2000
+    for (let i = 0; i < maxAttempts; i++) {
+      const ready = await getAudioStatus(data.trackingId)
+      if (ready) {
+        console.log(`Playlist ready! (attempt ${i + 1}/${maxAttempts})`)
+        setUrl('')
+        setWaveKey((k) => k + 1)
+        setReady(true)
+        break
+      }
+      console.log(`Poll attempt ${i + 1}/${maxAttempts}: not ready — retrying in ${intervalMs}ms`)
+      await new Promise((r) => setTimeout(r, intervalMs))
+    }
+
+    setLoading(false)
   }
 
   return (
@@ -114,31 +135,33 @@ export function SearchBar(): React.ReactNode {
         </button>
       </div>
 
+      {error && (
+        <p className="text-accent text-sm">{error}</p>
+      )}
+
       {loading && !ready && <WaveformSpinner />}
 
       {ready && (
         <div className="flex flex-col gap-8">
           <MetadataBar title={title} url={submittedUrl} />
-          <Waveform key={waveKey} duration={duration} currentTime={audio.currentTime} onSeek={audio.seekTo} />
+          <Waveform key={waveKey} duration={duration} currentTime={currentTime} onSeek={seekTo} />
           <PlayerControls
-            duration={audio.duration}
-            isPlaying={audio.isPlaying}
-            currentTime={audio.currentTime}
-            speed={audio.speed}
-            loop={audio.loop}
-            canSkipBack={audio.canSkipBack}
-            canSkipForward={audio.canSkipForward}
-            onTogglePlay={audio.togglePlay}
-            onSkipBack={audio.skipBack}
-            onSkipForward={audio.skipForward}
-            onSetSpeed={audio.setSpeed}
-            onToggleLoop={audio.toggleLoop}
-            audioRef={audio.audioRef}
+            isPlaying={isPlaying}
+            speed={speed}
+            loop={loop}
+            canSkipBack={canSkipBack}
+            canSkipForward={canSkipForward}
+            onTogglePlay={togglePlay}
+            onSkipBack={skipBack}
+            onSkipForward={skipForward}
+            onSetSpeed={setSpeed}
+            onToggleLoop={toggleLoop}
+            audioRef={audioRef}
           />
         </div>
       )}
 
-      <audio key={trackingId} ref={audio.audioRef} />
+      <audio key={trackingId} ref={audioRef} />
     </div>
   )
 }
