@@ -72,7 +72,10 @@ export function useAudioPlayer(
     const onTimeUpdate = () => dispatch({ type: 'TIME_UPDATE', time: audio.currentTime })
     const onPlay = () => dispatch({ type: 'PLAY' })
     const onPause = () => dispatch({ type: 'PAUSE' })
-    const onEnded = () => dispatch({ type: 'PAUSE' })
+    const onEnded = () => {
+      audio.currentTime = 0
+      dispatch({ type: 'PAUSE' })
+    }
     const onLoadedMeta = () => dispatch({ type: 'LOADED' })
     const onCanPlay = () => dispatch({ type: 'LOADED' })
 
@@ -86,6 +89,9 @@ export function useAudioPlayer(
     if (Hls.isSupported()) {
       const hls = new Hls()
       hls.config.startPosition = 0
+      hls.config.maxBufferLength = 60
+      hls.config.backbufferLength = Infinity
+      hls.config.lowLatencyMode = false
       hlsRef.current = hls
       hls.loadSource(playlistUrl)
       hls.attachMedia(audio)
