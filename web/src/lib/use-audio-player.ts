@@ -90,7 +90,7 @@ export function useAudioPlayer(
       const hls = new Hls()
       hls.config.startPosition = 0
       hls.config.maxBufferLength = 60
-      hls.config.backbufferLength = Infinity
+      hls.config.backBufferLength = Infinity
       hls.config.lowLatencyMode = false
       hlsRef.current = hls
       hls.loadSource(playlistUrl)
